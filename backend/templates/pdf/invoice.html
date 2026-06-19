@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{% if lang == 'ne' %}विजक{% else %}Invoice{% endif %} — {{ invoice.invoice_number }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=Noto+Sans+Devanagari:wght@400;700&display=swap');
+        
+        @page {
+            size: A4;
+            margin: 20mm;
+            @bottom-right {
+                content: "{% if lang == 'ne' %}पृष्ठ {% else %}Page {% endif %}" counter(page) " {% if lang == 'ne' %}को {% else %}of {% endif %}" counter(pages);
+                font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+                font-size: 8pt;
+                color: #718096;
+            }
+        }
+        body {
+            font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+            color: #2d3748;
+            margin: 0;
+            font-size: 10pt;
+            line-height: 1.5;
+        }
+        .header {
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+        .company-details {
+            float: left;
+            width: 50%;
+        }
+        .company-name {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #1a365d;
+            margin: 0 0 5px 0;
+        }
+        .company-meta {
+            font-size: 8.5pt;
+            color: #4a5568;
+            margin: 2px 0;
+        }
+        .invoice-title-block {
+            float: right;
+            text-align: right;
+            width: 50%;
+        }
+        .invoice-title {
+            font-size: 20pt;
+            font-weight: 800;
+            color: #2b6cb0;
+            margin: 0 0 5px 0;
+            text-transform: uppercase;
+        }
+        .pan-badge {
+            background-color: #edf2f7;
+            border: 1px solid #cbd5e0;
+            padding: 3px 8px;
+            font-weight: bold;
+            font-size: 9pt;
+            display: inline-block;
+            margin-top: 5px;
+            border-radius: 4px;
+        }
+        .clear {
+            clear: both;
+        }
+        .billing-container {
+            margin-bottom: 30px;
+        }
+        .billing-col {
+            width: 48%;
+            float: left;
+        }
+        .billing-col.right {
+            float: right;
+            text-align: right;
+        }
+        .section-title {
+            font-size: 9pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #718096;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 4px;
+        }
+        .bill-text {
+            margin: 3px 0;
+            font-size: 9.5pt;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .table th {
+            background-color: #ebf8ff;
+            border-bottom: 2px solid #bee3f8;
+            color: #2b6cb0;
+            font-weight: bold;
+            font-size: 9pt;
+            text-transform: uppercase;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 10px 12px;
+            font-size: 9.5pt;
+        }
+        .table .num {
+            text-align: right;
+        }
+        .summary-wrapper {
+            margin-top: 20px;
+        }
+        .summary-table {
+            float: right;
+            width: 300px;
+            border-collapse: collapse;
+        }
+        .summary-table td {
+            padding: 6px 12px;
+            font-size: 9.5pt;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .summary-table tr.total {
+            font-weight: bold;
+            font-size: 11pt;
+            color: #1a365d;
+            background-color: #ebf8ff;
+        }
+        .summary-table tr.total td {
+            border-top: 2px solid #bee3f8;
+            border-bottom: 2px solid #bee3f8;
+        }
+        .summary-table .num {
+            text-align: right;
+        }
+        .footnote {
+            margin-top: 60px;
+            font-size: 8pt;
+            color: #a0aec0;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="invoice-title-block">
+            <div class="invoice-title">{% if lang == 'ne' %}कर विजक{% else %}Tax Invoice{% endif %}</div>
+            <div><span class="pan-badge">{% if lang == 'ne' %}विक्रेता PAN{% else %}Seller PAN{% endif %}: {{ company_pan }}</span></div>
+        </div>
+        <div class="company-details">
+            <div class="company-name">{{ company_name }}</div>
+            <div class="company-meta">{{ company_address }}</div>
+            <div class="company-meta">{% if lang == 'ne' %}फोन{% else %}Phone{% endif %}: {{ company_phone }}</div>
+            <div class="company-meta">{% if lang == 'ne' %}इमेल{% else %}Email{% endif %}: billing@siaenterprises.com.np</div>
+        </div>
+        <div class="clear"></div>
+    </div>
+
+    <div class="billing-container">
+        <div class="billing-col">
+            <div class="section-title">{% if lang == 'ne' %}विजक विवरण{% else %}Invoice Information{% endif %}</div>
+            <p class="bill-text"><strong>{% if lang == 'ne' %}विजक नम्बर{% else %}Invoice Number{% endif %}:</strong> {{ invoice.invoice_number }}</p>
+            <p class="bill-text"><strong>{% if lang == 'ne' %}विजक मिति{% else %}Invoice Date{% endif %}:</strong> {{ invoice.created_at|date:"Y-m-d" }}</p>
+            <p class="bill-text"><strong>{% if lang == 'ne' %}आर्थिक वर्ष{% else %}Fiscal Year{% endif %}:</strong> {{ fiscal_year }}</p>
+            <p class="bill-text"><strong>{% if lang == 'ne' %}विजक स्थिति{% else %}Invoice Status{% endif %}:</strong> <span style="text-transform: uppercase; font-weight: bold; color: #2c5282;">{{ invoice.status }}</span></p>
+        </div>
+        <div class="billing-col right">
+            <div class="section-title">{% if lang == 'ne' %}प्राप्तकर्ता{% else %}Billed To{% endif %}</div>
+            {% if invoice.reservation %}
+                <p class="bill-text"><strong>{% if lang == 'ne' %}नाम{% else %}Name{% endif %}:</strong> {{ invoice.reservation.guest.full_name }}</p>
+                <p class="bill-text"><strong>{% if lang == 'ne' %}फोन नम्बर{% else %}Phone{% endif %}:</strong> {{ invoice.reservation.guest.phone }}</p>
+                <p class="bill-text"><strong>{% if lang == 'ne' %}राष्ट्रियता{% else %}Nationality{% endif %}:</strong> {{ invoice.reservation.guest.nationality }}</p>
+                <p class="bill-text"><strong>{% if lang == 'ne' %}कोठा नम्बर{% else %}Room Number{% endif %}:</strong> {{ invoice.reservation.room.room_number }}</p>
+            {% else %}
+                <p class="bill-text"><strong>{% if lang == 'ne' %}नाम{% else %}Name{% endif %}:</strong> {{ invoice.walk_in_guest_name|default:"Walk-in Guest" }}</p>
+                <p class="bill-text"><strong>{% if lang == 'ne' %}फोन नम्बर{% else %}Phone{% endif %}:</strong> {{ invoice.walk_in_guest_phone|default:"—" }}</p>
+            {% endif %}
+        </div>
+        <div class="clear"></div>
+    </div>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>{% if lang == 'ne' %}विवरण{% else %}Description{% endif %}</th>
+                <th class="num" style="width: 80px;">{% if lang == 'ne' %}परिमाण{% else %}Qty{% endif %}</th>
+                <th class="num" style="width: 120px;">{% if lang == 'ne' %}दर (रु.){% else %}Rate (NPR){% endif %}</th>
+                <th class="num" style="width: 150px;">{% if lang == 'ne' %}जम्मा (रु.){% else %}Amount (NPR){% endif %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in invoice.items.all %}
+            <tr>
+                <td>{{ item.description }}</td>
+                <td class="num">{{ item.quantity }}</td>
+                <td class="num">{{ item.unit_price }}</td>
+                <td class="num">{{ item.amount }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #a0aec0;">{% if lang == 'ne' %}कुनै पनि विवरण दर्ता गरिएको छैन।{% else %}No billable items registered.{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="summary-wrapper">
+        <table class="summary-table">
+            <tr>
+                <td>{% if lang == 'ne' %}कुल (Subtotal){% else %}Subtotal (Base){% endif %}</td>
+                <td class="num">{{ invoice.subtotal }}</td>
+            </tr>
+            {% if invoice.discount_amount > 0 %}
+            <tr>
+                <td>{% if lang == 'ne' %}छुट (Discount){% else %}Discount{% endif %}</td>
+                <td class="num">-{{ invoice.discount_amount }}</td>
+            </tr>
+            {% endif %}
+            {% if invoice.service_charge_amount > 0 %}
+            <tr>
+                <td>{% if lang == 'ne' %}सेवा शुल्क{% else %}Service Charge{% endif %} ({{ invoice.service_charge_rate }}%)</td>
+                <td class="num">{{ invoice.service_charge_amount }}</td>
+            </tr>
+            {% endif %}
+            {% if invoice.tax_amount > 0 %}
+            <tr>
+                <td>{% if lang == 'ne' %}मूल्य अभिवृद्धि कर{% else %}Value Added Tax{% endif %} (VAT {{ invoice.tax_rate }}%)</td>
+                <td class="num">{{ invoice.tax_amount }}</td>
+            </tr>
+            {% endif %}
+            <tr class="total">
+                <td>{% if lang == 'ne' %}कुल जम्मा{% else %}Grand Total{% endif %}</td>
+                <td class="num">NPR {{ invoice.total_amount }}</td>
+            </tr>
+            <tr>
+                <td>{% if lang == 'ne' %}भुक्तानी रकम{% else %}Paid Amount{% endif %}</td>
+                <td class="num">NPR {{ invoice.paid_amount }}</td>
+            </tr>
+            <tr style="font-weight: bold; color: #e53e3e;">
+                <td>{% if lang == 'ne' %}बाँकी रकम{% else %}Balance Due{% endif %}</td>
+                <td class="num">NPR {{ invoice.balance_due }}</td>
+            </tr>
+        </table>
+        <div class="clear"></div>
+    </div>
+
+    <div class="footnote">
+        <p>{% if lang == 'ne' %}यो आन्तरिक राजस्व विभाग (IRD) नेपालद्वारा स्वीकृत कम्प्युटर-उत्पादित कर विजक हो।{% else %}This is a computer-generated tax invoice approved by the Inland Revenue Department (IRD) Nepal.{% endif %}</p>
+        <p>{% if lang == 'ne' %}{{ company_name }} छनौट गर्नुभएकोमा धन्यवाद। तपाईंको यात्रा सुखद रहोस्!{% else %}Thank you for choosing {{ company_name }}. Have a pleasant journey!{% endif %}</p>
+    </div>
+</body>
+</html>
