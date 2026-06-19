@@ -24,7 +24,13 @@ class KDSConsumer(JsonWebsocketConsumer):
         )
 
     def receive_json(self, content, **kwargs):
-        pass
+        async_to_sync(self.channel_layer.group_send)(
+            self.group_name,
+            {
+                "type": "kds_order_update",
+                "data": content
+            }
+        )
 
     def kds_order_update(self, event):
         """

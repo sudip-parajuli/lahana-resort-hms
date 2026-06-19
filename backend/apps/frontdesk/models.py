@@ -57,6 +57,7 @@ class CheckOut(models.Model):
         KHALTI = "khalti", "Khalti"
         FONEPAY = "fonepay", "Fonepay"
         BANK_TRANSFER = "bank_transfer", "Bank Transfer"
+        SPLIT = "split", "Split"
 
     reservation = models.OneToOneField(
         Reservation,

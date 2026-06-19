@@ -4,6 +4,7 @@ SIA HMS — Front Desk Operations Tests
 
 import pytest
 from datetime import date, timedelta
+from decimal import Decimal
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -203,7 +204,7 @@ class TestFrontDeskOperations:
         payload = {"reservation_id": res.id, "key_issued": "KEY-1"}
         response = tenant_auth_client.post(url, payload)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "reservation_id" in response.data
+        assert "reservation_id" in response.data["detail"]
 
     def test_checkout_success(self, test_tenant, tenant_auth_client, sample_setup):
         prop, rt, room, guest = sample_setup
@@ -242,6 +243,7 @@ class TestFrontDeskOperations:
         }
         
         response = tenant_auth_client.post(url, payload, format="json")
+        print("CHECKOUT RESPONSE DATA:", response.data)
         assert response.status_code == status.HTTP_200_OK
         assert float(response.data["total_amount"]) == 10740.00 # 9040 + 1200 + 500
         
@@ -263,6 +265,83 @@ class TestFrontDeskOperations:
             # Loyalty credits (10740 // 100 = 107 points)
             loyalty = LoyaltyAccount.objects.get(guest=guest)
             assert loyalty.points_balance == 107
+
+    def test_checkout_split_success(self, test_tenant, tenant_auth_client, sample_setup):
+        prop, rt, room, guest = sample_setup
+        with schema_context(test_tenant.schema_name):
+            # Create a checked-in reservation
+            res = Reservation.objects.create(
+                guest=guest,
+                room=room,
+                check_in_date=date.today() - timedelta(days=2),
+                check_out_date=date.today(),
+                adults=2,
+                total_nights=2,
+                base_amount=8000,
+                tax_amount=1040,
+                total_amount=9040,
+                status=ReservationStatus.CHECKED_IN,
+            )
+            room.status = RoomStatus.OCCUPIED
+            room.save()
+            
+            CheckIn.objects.create(
+                reservation=res,
+                key_issued="KEY-SPLIT",
+            )
+            
+        url = reverse("frontdesk-checkout")
+        payload = {
+            "reservation_id": res.id,
+            "additional_charges": [
+                {"description": "Minibar", "amount": 1000.00},
+            ],
+            "payment_method": "split",
+            "feedback_rating": 4,
+            "feedback_comment": "Good",
+        }
+        
+        response = tenant_auth_client.post(url, payload, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        invoice_id = response.data["invoice_id"]
+        assert float(response.data["total_amount"]) == 10040.00 # 9040 + 1000
+        
+        # Verify invoice is UNPAID in DB
+        with schema_context(test_tenant.schema_name):
+            inv = Invoice.objects.get(id=invoice_id)
+            assert inv.status == InvoiceStatus.UNPAID
+            assert inv.balance_due == Decimal("10040.00")
+            assert inv.paid_amount == Decimal("0.00")
+            
+        # Settle invoice via splits
+        split_url = reverse("invoice-split", kwargs={"pk": invoice_id})
+        split_payload = {
+            "splits": [
+                {
+                    "amount": "4000.00",
+                    "payment_method": "cash",
+                    "reference": "REF-C1",
+                    "description": "Guest 1 portion",
+                },
+                {
+                    "amount": "6040.00",
+                    "payment_method": "esewa",
+                    "reference": "REF-E1",
+                    "description": "Guest 2 portion",
+                }
+            ]
+        }
+        
+        split_response = tenant_auth_client.post(split_url, split_payload, format="json")
+        assert split_response.status_code == status.HTTP_201_CREATED
+        assert split_response.data["status"] == "paid"
+        
+        with schema_context(test_tenant.schema_name):
+            inv.refresh_from_db()
+            assert inv.status == InvoiceStatus.PAID
+            assert inv.balance_due == Decimal("0.00")
+            assert inv.paid_amount == Decimal("10040.00")
+            assert inv.split_payments.count() == 2
 
     def test_walkin_success(self, test_tenant, tenant_auth_client, sample_setup):
         prop, rt, room, guest = sample_setup

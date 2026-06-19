@@ -37,9 +37,14 @@ urlpatterns = [
     path("api/analytics/", include("apps.analytics.urls")),
     # Notifications
     path("api/notifications/", include("apps.notifications.urls")),
-    # Super Admin & Subscriptions
-    path("api/admin/", include("apps.subscriptions.urls")),
 ]
+
+# Conditionally include subscriptions / superadmin endpoints in SaaS mode
+if getattr(settings, "DEPLOYMENT_MODE", "saas") != "single_tenant":
+    urlpatterns += [
+        path("api/admin/", include("apps.subscriptions.urls")),
+    ]
+
 
 # Serve media files in development
 if settings.DEBUG:

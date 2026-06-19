@@ -1,0 +1,32 @@
+{
+  "name": "Lahana Resort PMS",
+  "short_name": "Lahana PMS",
+  "description": "Property Management System — Lahana Resort",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FAFAF7",
+  "theme_color": "#2D5016",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "POS Orders",
+      "url": "/pos/",
+      "icons": [{ "src": "/icons/pos-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Front Desk",
+      "url": "/frontdesk/",
+      "icons": [{ "src": "/icons/frontdesk-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Housekeeping",
+      "url": "/housekeeping/my-tasks/",
+      "icons": [{ "src": "/icons/housekeeping-icon.png", "sizes": "96x96" }]
+    }
+  ]
+}

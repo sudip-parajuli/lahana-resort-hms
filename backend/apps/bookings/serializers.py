@@ -40,6 +40,7 @@ class ReservationSerializer(serializers.ModelSerializer):
     )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     booking_source_display = serializers.CharField(source="get_booking_source_display", read_only=True)
+    cancellation_policy_details = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Reservation
@@ -73,6 +74,7 @@ class ReservationSerializer(serializers.ModelSerializer):
             "created_by",
             "created_at",
             "updated_at",
+            "cancellation_policy_details",
         ]
         read_only_fields = [
             "total_nights",
@@ -85,6 +87,17 @@ class ReservationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_cancellation_policy_details(self, obj):
+        try:
+            prop = obj.room.room_type.property
+            return {
+                "free_cancellation_days": prop.free_cancellation_days,
+                "cancellation_refund_percent": prop.cancellation_refund_percent,
+                "advance_deposit_percent": prop.advance_deposit_percent,
+            }
+        except Exception:
+            return None
 
     def validate(self, attrs):
         check_in = attrs.get("check_in_date")
@@ -144,4 +157,31 @@ class ReservationSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data["created_by"] = request.user
 
-        return super().create(validated_data)
+        # Calculate advance deposit if required by property
+        from decimal import Decimal
+        prop = room.room_type.property
+        deposit_amount = Decimal("0.00")
+        if prop.advance_deposit_percent > 0:
+            deposit_percent = Decimal(str(prop.advance_deposit_percent))
+            total_amount = Decimal(str(validated_data["total_amount"]))
+            deposit_amount = (total_amount * deposit_percent / Decimal("100.00")).quantize(Decimal("0.01"))
+
+        validated_data["deposit_amount"] = deposit_amount
+        validated_data["deposit_paid"] = False
+
+        reservation = super().create(validated_data)
+
+        # Automatically generate unpaid deposit invoice
+        if deposit_amount > 0:
+            from apps.billing.models import Invoice, InvoiceStatus, InvoiceType
+            Invoice.objects.create(
+                reservation=reservation,
+                subtotal=deposit_amount,
+                total_amount=deposit_amount,
+                balance_due=deposit_amount,
+                status=InvoiceStatus.UNPAID,
+                invoice_type=InvoiceType.HOTEL,
+                notes="Advance deposit invoice",
+            )
+
+        return reservation

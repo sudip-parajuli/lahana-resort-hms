@@ -13,6 +13,8 @@ export const billingApi = {
     apiClient.put<Invoice>(`/billing/invoices/${id}/`, data),
   voidInvoice: (id: number) =>
     apiClient.post<Invoice>(`/billing/invoices/${id}/void/`),
+  splitInvoice: (id: number, data: { splits: Array<{ payment_method: string; amount: string; reference?: string; description?: string }> }) =>
+    apiClient.post<Invoice>(`/billing/invoices/${id}/split/`, data),
   
   // Custom Payment Record
   recordPayment: (id: number, data: { amount: string; payment_method: string; reference_number?: string; notes?: string }) =>

@@ -11,6 +11,11 @@ import { restaurantApi } from "@/lib/api/restaurant";
 import { posApi } from "@/lib/api/pos";
 import { usePOSStore } from "@/lib/store/posStore";
 import type { MenuCategory, MenuItem, Order, DiningTable } from "@/lib/types";
+import { OfflineBanner } from "@/components/modules/pos/OfflineBanner";
+import { getCacheItem, setCacheItem } from "@/lib/offlineQueue";
+import { useWebSocket } from "@/lib/hooks/useWebSocket";
+import { toast } from "sonner";
+import { Bell } from "lucide-react";
 
 function POSContent() {
   const router = useRouter();
@@ -18,6 +23,22 @@ function POSContent() {
   const orderIdParam = searchParams.get("orderId");
 
   const { tableId, setTable, clearCart } = usePOSStore();
+
+  // Connect to websocket for calling waiter notifications
+  useWebSocket("kds/all", {
+    onMessage: (message) => {
+      const { event, table_number, area_name } = message;
+      if (event === "call_waiter") {
+        toast.info(
+          `🔔 Table ${table_number} (${area_name}) is calling a waiter!`,
+          {
+            duration: 10000,
+          }
+        );
+      }
+    },
+    onError: (err) => console.error("POS WebSocket error", err),
+  });
 
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
@@ -39,8 +60,20 @@ function POSContent() {
       setCategories(categoriesRes.data);
       setTables(tablesRes.data);
       setActiveOrders(activeOrdersRes.data);
+
+      // Save to cache
+      await setCacheItem("categories", categoriesRes.data);
+      await setCacheItem("tables", tablesRes.data);
+      await setCacheItem("activeOrders", activeOrdersRes.data);
     } catch (err) {
-      console.error("Failed to load POS catalog", err);
+      console.error("Failed to load POS catalog, trying offline cache fallback", err);
+      const cachedCategories = await getCacheItem<MenuCategory[]>("categories");
+      const cachedTables = await getCacheItem<DiningTable[]>("tables");
+      const cachedActiveOrders = await getCacheItem<Order[]>("activeOrders");
+
+      if (cachedCategories) setCategories(cachedCategories);
+      if (cachedTables) setTables(cachedTables);
+      if (cachedActiveOrders) setActiveOrders(cachedActiveOrders);
     }
   };
 
@@ -53,6 +86,17 @@ function POSContent() {
       setSelectedTable(null);
     }
   }, [tableId, tables]);
+
+  // Parse and set table from URL query param
+  useEffect(() => {
+    const tableParam = searchParams.get("table");
+    if (tableParam && tables.length > 0) {
+      const parsedId = parseInt(tableParam);
+      if (!isNaN(parsedId)) {
+        setTable(parsedId);
+      }
+    }
+  }, [searchParams, tables, setTable]);
 
   // Load initial data
   useEffect(() => {
@@ -127,6 +171,7 @@ function POSContent() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
+      <OfflineBanner onSyncComplete={loadBaseData} />
       {/* POS Top Bar */}
       <div className="px-6 py-3 border-b border-slate-900 bg-slate-950 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex items-center gap-4">

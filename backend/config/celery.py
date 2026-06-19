@@ -36,22 +36,32 @@ app.conf.beat_schedule = {
         "task": "apps.crm.tasks.send_winback_campaign",
         "schedule": crontab(hour=10, minute=0),
     },
-    # Subscriptions: renewal reminders daily at 9am
-    "subscription-renewal-reminders": {
-        "task": "apps.subscriptions.tasks.send_renewal_reminders",
-        "schedule": crontab(hour=9, minute=0),
-    },
-    # Subscriptions: suspend past-due tenants daily at midnight
-    "suspend-past-due-tenants": {
-        "task": "apps.subscriptions.tasks.suspend_overdue_tenants",
-        "schedule": crontab(hour=0, minute=5),
-    },
-    # Subscriptions: generate monthly invoices on the 1st at 6am
-    "generate-monthly-invoices": {
-        "task": "apps.subscriptions.tasks.generate_monthly_invoices",
-        "schedule": crontab(hour=6, minute=0, day_of_month=1),
+    # Housekeeping: daily morning scheduler at 7:00 AM
+    "generate-morning-housekeeping-schedule": {
+        "task": "apps.housekeeping.tasks.generate_morning_housekeeping_schedule",
+        "schedule": crontab(hour=7, minute=0),
     },
 }
+
+from decouple import config
+if config("DEPLOYMENT_MODE", default="saas") != "single_tenant":
+    app.conf.beat_schedule.update({
+        # Subscriptions: renewal reminders daily at 9am
+        "subscription-renewal-reminders": {
+            "task": "apps.subscriptions.tasks.send_renewal_reminders",
+            "schedule": crontab(hour=9, minute=0),
+        },
+        # Subscriptions: suspend past-due tenants daily at midnight
+        "suspend-past-due-tenants": {
+            "task": "apps.subscriptions.tasks.suspend_overdue_tenants",
+            "schedule": crontab(hour=0, minute=5),
+        },
+        # Subscriptions: generate monthly invoices on the 1st at 6am
+        "generate-monthly-invoices": {
+            "task": "apps.subscriptions.tasks.generate_monthly_invoices",
+            "schedule": crontab(hour=6, minute=0, day_of_month=1),
+        },
+    })
 
 app.conf.timezone = "Asia/Kathmandu"
 

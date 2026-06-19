@@ -35,7 +35,7 @@
         .company-name {
             font-size: 18pt;
             font-weight: bold;
-            color: #1a365d;
+            color: #2D5016;
             margin: 0 0 5px 0;
         }
         .company-meta {
@@ -51,13 +51,13 @@
         .invoice-title {
             font-size: 20pt;
             font-weight: 800;
-            color: #2b6cb0;
+            color: #2D5016;
             margin: 0 0 5px 0;
             text-transform: uppercase;
         }
         .pan-badge {
-            background-color: #edf2f7;
-            border: 1px solid #cbd5e0;
+            background-color: #FAFAF7;
+            border: 1px solid #C9A84C;
             padding: 3px 8px;
             font-weight: bold;
             font-size: 9pt;
@@ -99,9 +99,9 @@
             margin-bottom: 30px;
         }
         .table th {
-            background-color: #ebf8ff;
-            border-bottom: 2px solid #bee3f8;
-            color: #2b6cb0;
+            background-color: #FAFAF7;
+            border-bottom: 2px solid #C9A84C;
+            color: #2D5016;
             font-weight: bold;
             font-size: 9pt;
             text-transform: uppercase;
@@ -132,12 +132,12 @@
         .summary-table tr.total {
             font-weight: bold;
             font-size: 11pt;
-            color: #1a365d;
-            background-color: #ebf8ff;
+            color: #2D5016;
+            background-color: #FAFAF7;
         }
         .summary-table tr.total td {
-            border-top: 2px solid #bee3f8;
-            border-bottom: 2px solid #bee3f8;
+            border-top: 2px solid #C9A84C;
+            border-bottom: 2px solid #C9A84C;
         }
         .summary-table .num {
             text-align: right;
@@ -159,10 +159,13 @@
             <div><span class="pan-badge">{% if lang == 'ne' %}विक्रेता PAN{% else %}Seller PAN{% endif %}: {{ company_pan }}</span></div>
         </div>
         <div class="company-details">
+            {% if logo_url %}
+            <img src="{{ logo_url }}" style="height: 50px; margin-bottom: 8px; display: block;" alt="Logo">
+            {% endif %}
             <div class="company-name">{{ company_name }}</div>
             <div class="company-meta">{{ company_address }}</div>
             <div class="company-meta">{% if lang == 'ne' %}फोन{% else %}Phone{% endif %}: {{ company_phone }}</div>
-            <div class="company-meta">{% if lang == 'ne' %}इमेल{% else %}Email{% endif %}: billing@siaenterprises.com.np</div>
+            <div class="company-meta">{% if lang == 'ne' %}इमेल{% else %}Email{% endif %}: {{ company_email }}</div>
         </div>
         <div class="clear"></div>
     </div>
@@ -254,6 +257,34 @@
         </table>
         <div class="clear"></div>
     </div>
+
+    {% if invoice.split_payments.exists %}
+    <div style="margin-top: 30px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; background-color: #FAFAF7;">
+        <div style="font-weight: bold; color: #2D5016; font-size: 10pt; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid #C9A84C; padding-bottom: 5px;">
+            {% if lang == 'ne' %}भुक्तानी बाँडफाँड विवरण{% else %}Split Payment Breakdown{% endif %}
+        </div>
+        <table style="width: 100%; font-size: 9pt; border-collapse: collapse;">
+            <thead>
+                <tr style="color: #718096; text-align: left; border-bottom: 1px solid #edf2f7;">
+                    <th style="padding: 5px 0;">{% if lang == 'ne' %}भुक्तानी विधि{% else %}Payment Method{% endif %}</th>
+                    <th style="padding: 5px 0;">{% if lang == 'ne' %}विवरण{% else %}Description{% endif %}</th>
+                    <th style="padding: 5px 0;">{% if lang == 'ne' %}संकेत नम्बर{% else %}Reference{% endif %}</th>
+                    <th style="padding: 5px 0; text-align: right;">{% if lang == 'ne' %}रकम (रु.){% else %}Amount (NPR){% endif %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sp in invoice.split_payments.all %}
+                <tr style="border-bottom: 1px solid #edf2f7; last:border-bottom: 0;">
+                    <td style="padding: 8px 0; text-transform: uppercase; font-weight: bold;">{{ sp.payment_method }}</td>
+                    <td style="padding: 8px 0; color: #4a5568;">{{ sp.description|default:"—" }}</td>
+                    <td style="padding: 8px 0; font-family: monospace; color: #718096;">{{ sp.reference|default:"—" }}</td>
+                    <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #2D5016;">NPR {{ sp.amount }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 
     <div class="footnote">
         <p>{% if lang == 'ne' %}यो आन्तरिक राजस्व विभाग (IRD) नेपालद्वारा स्वीकृत कम्प्युटर-उत्पादित कर विजक हो।{% else %}This is a computer-generated tax invoice approved by the Inland Revenue Department (IRD) Nepal.{% endif %}</p>

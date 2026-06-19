@@ -46,8 +46,13 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
   const t = useTranslations("Sidebar");
 
+  const isSingleTenant = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "single_tenant";
+
   const visibleItems = navItems.filter(
-    (item) => !item.roles || (user && item.roles.includes(item.roles[0]))
+    (item) => {
+      if (isSingleTenant && item.key === "superadmin") return false;
+      return !item.roles || (user && item.roles.includes(item.roles[0]));
+    }
   );
 
   return (

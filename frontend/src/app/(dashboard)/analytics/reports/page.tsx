@@ -48,7 +48,7 @@ export default function ReportsConsole() {
   const fetchExports = async () => {
     try {
       const res = await analyticsApi.listReports();
-      setExportsList(res.data);
+      setExportsList((res.data as any).results || (Array.isArray(res.data) ? res.data : []));
     } catch (err) {
       console.error(err);
     } finally {

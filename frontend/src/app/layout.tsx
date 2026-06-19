@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
+import PWARegister from "@/components/PWARegister";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -16,8 +17,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "SIA Enterprises Hotel Management System",
-  description: "Enterprise SaaS Hotel Management Platform",
+  title: "Lahana Resort PMS",
+  description: "Lahana Resort - Property Management System",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -30,6 +32,7 @@ export default function RootLayout({
       <body className="antialiased">
         {children}
         <Toaster position="top-right" richColors />
+        <PWARegister />
       </body>
     </html>
   );

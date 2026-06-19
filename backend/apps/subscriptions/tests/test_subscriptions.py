@@ -1,8 +1,9 @@
-"""
-SIA HMS — Subscriptions & Super Admin Integration Tests
-"""
-
 import pytest
+from django.conf import settings
+
+if getattr(settings, "DEPLOYMENT_MODE", "saas") == "single_tenant":
+    pytest.skip("Skipping subscription tests in single tenant mode", allow_module_level=True)
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient

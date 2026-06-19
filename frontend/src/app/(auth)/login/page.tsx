@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import { KeyRound, Mail, Loader2 } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +24,10 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginFormContent() {
   const { login } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
   const [locale, setLocale] = useState<"en" | "ne">("en");
 
@@ -47,6 +50,11 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
       toast.success(locale === "ne" ? "सफलतापूर्वक लगइन भयो! ड्यासबोर्डमा रिडिरेक्ट हुँदैछ..." : "Successfully logged in! Redirecting to dashboard...");
+      
+      const redirectUrl = searchParams.get("redirect");
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      }
     } catch (err: any) {
       console.error(err);
       const errorMsg =
@@ -74,7 +82,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setLocale("en")}
                 className={`px-2 py-0.5 text-[9px] font-bold rounded-full transition-all ${
-                  locale === "en" ? "bg-cyan-500 text-slate-950" : "text-slate-400 hover:text-white"
+                  locale === "en" ? "bg-[#C9A84C] text-slate-950" : "text-slate-400 hover:text-white"
                 }`}
               >
                 EN
@@ -83,18 +91,18 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setLocale("ne")}
                 className={`px-2 py-0.5 text-[9px] font-bold rounded-full transition-all ${
-                  locale === "ne" ? "bg-cyan-500 text-slate-950" : "text-slate-400 hover:text-white"
+                  locale === "ne" ? "bg-[#C9A84C] text-slate-950" : "text-slate-400 hover:text-white"
                 }`}
               >
                 NE
               </button>
             </div>
 
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/20">
-              <KeyRound className="h-6 w-6 text-white" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-[#C9A84C] shadow-lg shadow-[#C9A84C]/10">
+              <img src="/lahana-logo.png" className="h-10 w-10 object-contain" alt="Lahana Logo" />
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              SIA Enterprises
+            <CardTitle className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[#FAFAF7] via-slate-100 to-[#C9A84C] bg-clip-text text-transparent mt-2">
+              Lahana Resort
             </CardTitle>
             <CardDescription className="text-slate-400 font-medium">
               {t.subtitle}
@@ -109,12 +117,12 @@ export default function LoginPage() {
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@hotel.com"
-                    {...register("email")}
-                    disabled={submitting}
-                    className="pl-10 bg-white/5 border-white/15 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                     id="email"
+                     type="email"
+                     placeholder="name@hotel.com"
+                     {...register("email")}
+                     disabled={submitting}
+                     className="pl-10 bg-white/5 border-white/15 text-white placeholder:text-slate-500 focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/30 transition-all"
                   />
                 </div>
                 {errors.email && (
@@ -132,11 +140,11 @@ export default function LoginPage() {
                   <KeyRound className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
                     id="password"
-                    type="password"
+                     type="password"
                     placeholder="••••••••"
                     {...register("password")}
                     disabled={submitting}
-                    className="pl-10 bg-white/5 border-white/15 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                    className="pl-10 bg-white/5 border-white/15 text-white placeholder:text-slate-500 focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/30 transition-all"
                   />
                 </div>
                 {errors.password && (
@@ -147,7 +155,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={submitting}
-                className="w-full mt-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold shadow-md shadow-cyan-500/10 hover:shadow-cyan-500/20 transition-all duration-300 transform active:scale-[0.98] py-2.5"
+                className="w-full mt-2 bg-[#2D5016] hover:bg-[#1E3A0E] text-white border border-[#C9A84C]/50 font-semibold shadow-md shadow-[#2D5016]/10 hover:shadow-[#2D5016]/20 transition-all duration-300 transform active:scale-[0.98] py-2.5"
               >
                 {submitting ? (
                   <>
@@ -160,13 +168,28 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center border-t border-white/5 pt-4 pb-6">
-            <span className="text-xs text-slate-500 font-medium">
-              SIA Enterprises SaaS Engine © 2026
+          <CardFooter className="flex flex-col items-center border-t border-white/5 pt-4 pb-6 gap-1">
+            <span className="text-xs text-slate-400 font-medium">
+              Staff Portal
+            </span>
+            <span className="text-[10px] text-slate-500 font-medium">
+              Powered by SIA Enterprises
             </span>
           </CardFooter>
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+        <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   );
 }

@@ -6,18 +6,6 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const hostname = host.split(":")[0];
 
-  // Resolve subdomain
-  let subdomain: string | null = null;
-  if (hostname.endsWith(".localhost")) {
-    const parts = hostname.split(".");
-    if (parts.length > 1) {
-      subdomain = parts[0];
-    }
-  } else if (hostname.endsWith(".siaenterprises.com.np")) {
-    const base = ".siaenterprises.com.np";
-    subdomain = hostname.substring(0, hostname.length - base.length);
-  }
-
   const hasAccessToken = request.cookies.has("access_token");
   const hasRefreshToken = request.cookies.has("refresh_token");
   const isAuthenticated = hasAccessToken || hasRefreshToken;
@@ -30,9 +18,38 @@ export function middleware(request: NextRequest) {
     cleanPath === "/login" ||
     cleanPath === "/register" ||
     cleanPath.startsWith("/book") ||
+    cleanPath.startsWith("/scan") ||
+    cleanPath.startsWith("/menu") ||
     cleanPath.startsWith("/_next") ||
     cleanPath.startsWith("/api-auth") ||
     cleanPath === "/favicon.ico";
+
+  const isSingleTenant = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "single_tenant";
+
+  if (isSingleTenant) {
+    // In single tenant mode, direct routing on the primary domain
+    if (!isAuthenticated && !isPublicPath) {
+      return NextResponse.redirect(new URL("/login/", request.url));
+    }
+
+    if (isAuthenticated && (cleanPath === "/login" || cleanPath === "/register")) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    return NextResponse.next();
+  }
+
+  // Resolve subdomain
+  let subdomain: string | null = null;
+  if (hostname.endsWith(".localhost")) {
+    const parts = hostname.split(".");
+    if (parts.length > 1) {
+      subdomain = parts[0];
+    }
+  } else if (hostname.endsWith(".siaenterprises.com.np")) {
+    const base = ".siaenterprises.com.np";
+    subdomain = hostname.substring(0, hostname.length - base.length);
+  }
 
   // 1. PUBLIC DOMAIN ROUTING (No subdomain)
   if (!subdomain) {

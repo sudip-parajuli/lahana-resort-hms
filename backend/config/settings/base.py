@@ -12,16 +12,22 @@ from decouple import config, Csv
 # ─────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+import sys
+IS_TESTING = 'test' in sys.argv or any('pytest' in arg for arg in sys.argv) or 'pytest' in sys.modules
+
 # ─────────────────────────────
 # Security
 # ─────────────────────────────
 SECRET_KEY = config("DJANGO_SECRET_KEY")
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
+ALLOWED_HOSTS = ["*"] if IS_TESTING else config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 USE_X_FORWARDED_HOST = True
 
 # ─────────────────────────────
 # Multi-Tenant Apps (django-tenants)
 # ─────────────────────────────
+DEPLOYMENT_MODE = "saas" if IS_TESTING else config("DEPLOYMENT_MODE", default="saas")
+SINGLE_TENANT_SCHEMA = config("SINGLE_TENANT_SCHEMA", default="lahana_resort")
+
 SHARED_APPS = [
     # django-tenants must be first
     "django_tenants",
@@ -42,8 +48,10 @@ SHARED_APPS = [
     # SIA shared apps
     "apps.tenants",
     "apps.accounts",
-    "apps.subscriptions",
 ]
+
+if DEPLOYMENT_MODE != "single_tenant":
+    SHARED_APPS.append("apps.subscriptions")
 
 TENANT_APPS = [
     # Tenant-specific Django
@@ -83,8 +91,13 @@ SHOW_PUBLIC_IF_NO_TENANT_FOUND = False
 # Middleware
 # ─────────────────────────────
 MIDDLEWARE = [
-    "django_tenants.middleware.main.TenantMainMiddleware",
-    "apps.tenants.middleware.ImpersonationMiddleware",
+    "apps.tenants.middleware.SingleTenantMiddleware" if DEPLOYMENT_MODE == "single_tenant" else "django_tenants.middleware.main.TenantMainMiddleware",
+]
+
+if DEPLOYMENT_MODE != "single_tenant":
+    MIDDLEWARE.append("apps.tenants.middleware.ImpersonationMiddleware")
+
+MIDDLEWARE += [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -142,27 +155,35 @@ DATABASES = {
 
 DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 
-# ─────────────────────────────
-# Cache (Redis)
-# ─────────────────────────────
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": config("REDIS_URL", default="redis://localhost:6379/0"),
+if IS_TESTING:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": config("REDIS_URL", default="redis://localhost:6379/0"),
+        }
+    }
 
-# ─────────────────────────────
-# Channels (WebSocket)
-# ─────────────────────────────
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [config("REDIS_URL", default="redis://localhost:6379/0")],
-        },
+if IS_TESTING:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
     }
-}
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [config("REDIS_URL", default="redis://localhost:6379/0")],
+            },
+        }
+    }
 
 # ─────────────────────────────
 # Custom User Model
@@ -259,6 +280,7 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://pailarestrosample-web.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -271,6 +293,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "https://*.siaenterprises.com.np",
+    "https://pailarestrosample-web.vercel.app",
 ]
 
 # ─────────────────────────────

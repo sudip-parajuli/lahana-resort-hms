@@ -44,6 +44,11 @@ class Property(models.Model):
     check_out_time = models.TimeField(default="12:00:00")
     cancellation_policy = models.TextField(blank=True)
     terms = models.TextField(blank=True)
+    
+    # Policies
+    free_cancellation_days = models.IntegerField(default=2)
+    cancellation_refund_percent = models.IntegerField(default=100)
+    advance_deposit_percent = models.IntegerField(default=50)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

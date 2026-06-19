@@ -29,6 +29,12 @@ interface CheckOutModalProps {
     payment_method: string;
     feedback_rating?: number;
     feedback_comment?: string;
+    splits?: Array<{
+      payment_method: string;
+      amount: string;
+      reference: string;
+      description: string;
+    }>;
   }) => Promise<void>;
 }
 
@@ -45,6 +51,14 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [splits, setSplits] = useState<Array<{
+    payment_method: string;
+    amount: string;
+    reference: string;
+    description: string;
+  }>>([
+    { payment_method: "cash", amount: "", reference: "", description: "" }
+  ]);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,6 +68,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
       setPaymentMethod("cash");
       setRating(5);
       setComment("");
+      setSplits([{ payment_method: "cash", amount: "", reference: "", description: "" }]);
     }
   }, [isOpen]);
 
@@ -84,9 +99,36 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
   };
 
   const { roomTotal, additionalTotal, grandTotal } = calculateTotals();
+  const depositPaid = (reservation.deposit_paid && reservation.deposit_amount) ? parseFloat(reservation.deposit_amount) : 0;
+  const remainingBalance = grandTotal - depositPaid;
+
+  const totalAllocated = splits.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const isAllocationValid = Math.abs(totalAllocated - remainingBalance) < 0.01;
+
+  const handleAddSplitRow = () => {
+    setSplits([
+      ...splits,
+      { payment_method: "cash", amount: "", reference: "", description: "" }
+    ]);
+  };
+
+  const handleRemoveSplitRow = (index: number) => {
+    if (splits.length === 1) return;
+    setSplits(splits.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateSplitRow = (index: number, key: string, value: string) => {
+    const newSplits = [...splits];
+    newSplits[index] = {
+      ...newSplits[index],
+      [key]: value
+    };
+    setSplits(newSplits);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (paymentMethod === "split" && !isAllocationValid) return;
     setSubmitting(true);
     try {
       await onConfirm({
@@ -95,6 +137,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
         payment_method: paymentMethod,
         feedback_rating: rating,
         feedback_comment: comment,
+        splits: paymentMethod === "split" ? splits : undefined,
       });
       onClose();
     } catch (err) {
@@ -211,8 +254,97 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                 <option value="khalti">Khalti Wallet (Nepal)</option>
                 <option value="fonepay">Fonepay QR scan</option>
                 <option value="bank_transfer">Direct Bank Transfer</option>
+                <option value="split">Split Payment (Group/Multiple)</option>
               </select>
             </div>
+
+            {/* Split allocations section */}
+            {paymentMethod === "split" && (
+              <div className="space-y-3 border border-slate-900 bg-slate-900/10 p-3.5 rounded-xl">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Split Payment Allocations</h4>
+                  <Button
+                    type="button"
+                    onClick={handleAddSplitRow}
+                    className="bg-emerald-850 text-emerald-400 hover:bg-emerald-800 border border-emerald-800/40 text-[10px] h-7 px-2.5 rounded-md flex items-center gap-1 font-bold"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Allocation
+                  </Button>
+                </div>
+
+                <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                  {splits.map((split, idx) => (
+                    <div key={idx} className="bg-slate-950 border border-slate-900 p-2.5 rounded-xl space-y-2 relative">
+                      {splits.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSplitRow(idx)}
+                          className="absolute right-2 top-2 text-slate-500 hover:text-red-400"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-slate-500 font-bold uppercase">Payment Method</label>
+                          <select
+                            value={split.payment_method}
+                            onChange={(e) => handleUpdateSplitRow(idx, "payment_method", e.target.value)}
+                            className="w-full rounded-md bg-slate-900 border border-slate-800 text-slate-300 text-[10px] p-1.5 h-8 outline-none focus:border-emerald-500"
+                          >
+                            <option value="cash">Cash (NPR)</option>
+                            <option value="card">Credit/Debit Card</option>
+                            <option value="esewa">eSewa Wallet</option>
+                            <option value="khalti">Khalti Wallet</option>
+                            <option value="fonepay">Fonepay QR</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-slate-500 font-bold uppercase">Amount (NPR)</label>
+                          <Input
+                            type="number"
+                            value={split.amount}
+                            onChange={(e) => handleUpdateSplitRow(idx, "amount", e.target.value)}
+                            placeholder="e.g. 5000"
+                            className="bg-slate-900 border-slate-800 text-slate-100 rounded-md h-8 text-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-slate-500 font-bold uppercase">Reference No.</label>
+                          <Input
+                            value={split.reference}
+                            onChange={(e) => handleUpdateSplitRow(idx, "reference", e.target.value)}
+                            placeholder="e.g. REF-1234"
+                            className="bg-slate-900 border-slate-800 text-slate-100 rounded-md h-8 text-[9px]"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-slate-500 font-bold uppercase">Allocation Description</label>
+                          <Input
+                            value={split.description}
+                            onChange={(e) => handleUpdateSplitRow(idx, "description", e.target.value)}
+                            placeholder="e.g. Guest A portion"
+                            className="bg-slate-900 border-slate-800 text-slate-100 rounded-md h-8 text-[9px]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] pt-1.5 border-t border-slate-900">
+                  <span className="text-slate-400">Total Allocated:</span>
+                  <span className={`font-bold ${isAllocationValid ? "text-emerald-400" : "text-amber-500"}`}>
+                    Rs. {totalAllocated.toLocaleString()} / Rs. {remainingBalance.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Feedback Rating & Comments */}
             <div className="grid grid-cols-3 gap-3">
@@ -259,9 +391,19 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                   <span>Additional Services Total</span>
                   <span>Rs. {additionalTotal.toLocaleString()}</span>
                 </div>
+                {depositPaid > 0 && (
+                  <div className="flex justify-between text-amber-400">
+                    <span>Advance Deposit Paid</span>
+                    <span>- Rs. {depositPaid.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm font-black text-white pt-1.5 border-t border-slate-900">
-                  <span>Total Amount Settled</span>
-                  <span className="text-emerald-400">Rs. {grandTotal.toLocaleString()}</span>
+                  <span>Grand Total Amount</span>
+                  <span className="text-white">Rs. {grandTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm font-black text-white pt-1.5 border-t border-slate-900">
+                  <span>{paymentMethod === "split" ? "Remaining Balance to Split" : "Amount to Settle Now"}</span>
+                  <span className="text-emerald-400">Rs. {remainingBalance.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -278,7 +420,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
             </Button>
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (paymentMethod === "split" && !isAllocationValid)}
               className="bg-gradient-to-tr from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-lg h-10 px-5 gap-1.5 shadow-lg shadow-emerald-500/10"
             >
               {submitting ? (

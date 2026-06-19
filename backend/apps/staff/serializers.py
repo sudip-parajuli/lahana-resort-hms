@@ -47,6 +47,23 @@ class StaffUserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "first_name", "last_name", "phone", "role", "password", "is_active"]
         read_only_fields = ["id"]
+        extra_kwargs = {
+            "email": {
+                "validators": []
+            }
+        }
+
+    def validate_email(self, value):
+        instance_user = None
+        if self.parent and getattr(self.parent, "instance", None):
+            instance_user = self.parent.instance.user
+
+        qs = User.objects.filter(email__iexact=value)
+        if instance_user:
+            qs = qs.exclude(pk=instance_user.pk)
+        if qs.exists():
+            raise serializers.ValidationError("User with this email already exists.")
+        return value
 
 
 class StaffMemberSerializer(serializers.ModelSerializer):

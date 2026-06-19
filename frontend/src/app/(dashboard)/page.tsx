@@ -1,73 +1,129 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Bed, CalendarCheck, UserCheck, DollarSign,
-  TrendingUp, Activity, ArrowUp, ArrowDown, Clock
+  Activity, ArrowUpRight, Clock, AlertTriangle,
+  Utensils, Hammer, RefreshCw, Loader2, Play
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/authStore";
-
-const statCards = [
-  {
-    title: "Occupancy Rate",
-    value: "78%",
-    change: "+4.1%",
-    positive: true,
-    icon: Bed,
-    color: "from-cyan-500 to-cyan-600",
-    glow: "shadow-cyan-500/20",
-  },
-  {
-    title: "Today's Arrivals",
-    value: "8",
-    change: "3 pending",
-    positive: true,
-    icon: CalendarCheck,
-    color: "from-emerald-500 to-emerald-600",
-    glow: "shadow-emerald-500/20",
-  },
-  {
-    title: "In-House Guests",
-    value: "31",
-    change: "-2 from yesterday",
-    positive: false,
-    icon: UserCheck,
-    color: "from-violet-500 to-violet-600",
-    glow: "shadow-violet-500/20",
-  },
-  {
-    title: "Today's Revenue",
-    value: "Rs. 45,800",
-    change: "+12.3% vs yesterday",
-    positive: true,
-    icon: DollarSign,
-    color: "from-amber-500 to-amber-600",
-    glow: "shadow-amber-500/20",
-  },
-];
-
-const recentActivity = [
-  { time: "10:45 AM", event: "Check-in: Ramesh Sharma — Room 201", type: "checkin" },
-  { time: "10:12 AM", event: "New booking: 2 nights, Room Type: Deluxe", type: "booking" },
-  { time: "09:58 AM", event: "Check-out: Priya Rana — Room 105", type: "checkout" },
-  { time: "09:30 AM", event: "Housekeeping completed: Rooms 201, 202", type: "housekeeping" },
-  { time: "09:00 AM", event: "POS Order #1042 — Table 3, Rs. 2,400", type: "pos" },
-];
-
-const activityColors: Record<string, string> = {
-  checkin: "bg-emerald-500",
-  checkout: "bg-rose-500",
-  booking: "bg-cyan-500",
-  housekeeping: "bg-amber-500",
-  pos: "bg-violet-500",
-};
+import { roomsApi } from "@/lib/api/rooms";
+import { frontdeskApi } from "@/lib/api/frontdesk";
+import { analyticsApi } from "@/lib/api/analytics";
+import { inventoryApi } from "@/lib/api/inventory";
+import { housekeepingApi } from "@/lib/api/housekeeping";
+import { posApi } from "@/lib/api/pos";
+import { apiClient } from "@/lib/api/client";
+import { RoomStatusGrid } from "@/components/modules/rooms/RoomStatusGrid";
+import { RoomDetailSheet } from "@/components/modules/rooms/RoomDetailSheet";
+import type { Room, RoomType, Reservation, InventoryItem, HousekeepingTask, MaintenanceRequest, Order, DiningTable } from "@/lib/types";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [time, setTime] = useState(new Date());
+
+  // Data states
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [arrivals, setArrivals] = useState<Reservation[]>([]);
+  const [departures, setDepartures] = useState<Reservation[]>([]);
+  const [inHouseCount, setInHouseCount] = useState(0);
+  const [occupancyRate, setOccupancyRate] = useState(0);
+  const [todayRevenue, setTodayRevenue] = useState(0);
+  const [restaurantCovers, setRestaurantCovers] = useState(0);
+  
+  // Restaurant POS details
+  const [tables, setTables] = useState<DiningTable[]>([]);
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+
+  // Alerts
+  const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([]);
+  const [pendingHKTasks, setPendingHKTasks] = useState<HousekeepingTask[]>([]);
+  const [openMaintenance, setOpenMaintenance] = useState<MaintenanceRequest[]>([]);
+
+  // Room Sheet control
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [
+        roomsRes,
+        typesRes,
+        fdStatsRes,
+        analyticsSummaryRes,
+        inventoryRes,
+        hkTasksRes,
+        posTablesRes,
+        activeOrdersRes
+      ] = await Promise.all([
+        roomsApi.listRooms(),
+        roomsApi.listRoomTypes(),
+        frontdeskApi.getTodayStats(),
+        analyticsApi.getDashboardSummary().catch(() => ({ data: { today: { total_revenue: 0, restaurant_covers: 0 } } })),
+        inventoryApi.getItems().catch(() => ({ data: [] })),
+        housekeepingApi.getTasks().catch(() => ({ data: [] })),
+        apiClient.get<DiningTable[]>("/restaurant/tables/").catch(() => ({ data: [] })),
+        posApi.getActiveOrders().catch(() => ({ data: [] }))
+      ]);
+
+      const loadedRooms = roomsRes.data.results || [];
+      setRooms(loadedRooms);
+      setRoomTypes(typesRes.data.results || []);
+      
+      // Front Desk data
+      setArrivals(fdStatsRes.data.arrivals || []);
+      setDepartures(fdStatsRes.data.departures || []);
+      setInHouseCount(fdStatsRes.data.in_house?.length || 0);
+      setOccupancyRate(fdStatsRes.data.occupancy_rate || 0);
+
+      // Analytics Summary
+      const summaryToday = analyticsSummaryRes.data.today || {};
+      setTodayRevenue(summaryToday.total_revenue || 0);
+      setRestaurantCovers(summaryToday.restaurant_covers || 0);
+
+      // POS Data
+      setTables(posTablesRes.data || []);
+      setActiveOrdersCount(activeOrdersRes.data?.length || 0);
+
+      // Inventory alerts (Low stock: current_stock < reorder_level)
+      const inventoryItems = Array.isArray(inventoryRes.data) ? inventoryRes.data : ((inventoryRes.data as any)?.results || []);
+      const lowStock = inventoryItems.filter(
+        (item: InventoryItem) => parseFloat(item.current_stock) < parseFloat(item.reorder_level)
+      );
+      setLowStockItems(lowStock);
+
+      // Housekeeping Alerts
+      const hkTasks = Array.isArray(hkTasksRes.data) ? hkTasksRes.data : ((hkTasksRes.data as any)?.results || []);
+      const pendingHK = hkTasks.filter(
+        (task: HousekeepingTask) => task.status === "pending" || task.status === "in_progress"
+      );
+      setPendingHKTasks(pendingHK);
+
+      // Maintenance requests (Open/In progress)
+      try {
+        const maintenanceRes = await apiClient.get<MaintenanceRequest[]>("/housekeeping/maintenance/");
+        const openMaint = (maintenanceRes.data || []).filter((req) => req.status !== "resolved");
+        setOpenMaintenance(openMaint);
+      } catch (maintErr) {
+        console.error("Failed to load maintenance requests", maintErr);
+      }
+
+    } catch (err) {
+      console.error("Failed to load dashboard statistics", err);
+      toast.error("Error loading daily operations data.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (user?.role === "SUPER_ADMIN") {
@@ -83,143 +139,325 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    setLoading(true);
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleRoomClick = (room: Room) => {
+    setSelectedRoom(room);
+    setIsSheetOpen(true);
+  };
+
+  const handleRefresh = () => {
+    setLoading(true);
+    loadDashboardData();
+  };
+
+  const totalTables = tables.length;
+  const occupiedTables = tables.filter((t) => t.status === "occupied").length;
+
+  if (loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-slate-950 text-white gap-3">
+        <Loader2 className="h-10 w-10 text-cyan-500 animate-spin" />
+        <span className="text-sm text-slate-400 font-medium">Synthesizing resort operations...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-white tracking-tight">
             Good {time.getHours() < 12 ? "Morning" : time.getHours() < 17 ? "Afternoon" : "Evening"},{" "}
-            <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#C9A84C] to-amber-300 bg-clip-text text-transparent">
               {user?.first_name ?? "Manager"}
             </span>
           </h1>
           <p className="text-slate-400 text-sm">
-            Here's what's happening at your hotel today.
+            Operational overview for {time.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-slate-400 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5">
-          <Clock className="h-4 w-4 text-cyan-400" />
-          <span className="font-mono text-sm font-medium text-slate-300">
-            {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-          </span>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            className="border-slate-800 text-slate-300 hover:text-white bg-slate-900/40 hover:bg-slate-900 h-10 w-10 p-0"
+          >
+            <RefreshCw className="h-4.5 w-4.5" />
+          </Button>
+          <div className="flex items-center gap-2 text-slate-400 bg-slate-900/40 border border-slate-800/80 rounded-xl px-4 py-2 h-10">
+            <Clock className="h-4 w-4 text-[#C9A84C]" />
+            <span className="font-mono text-sm font-medium text-slate-300">
+              {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Stat Cards */}
+      {/* Today's KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <Card
-              key={i}
-              className="bg-slate-900/60 border-slate-800 hover:border-slate-700 transition-all duration-200 group overflow-hidden"
-            >
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  {stat.title}
-                </CardTitle>
-                <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.color} shadow-md ${stat.glow} group-hover:scale-110 transition-transform duration-200`}>
-                  <Icon className="h-3.5 w-3.5 text-white" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{stat.value}</div>
-                <div className={`flex items-center gap-1 mt-1 text-xs font-medium ${stat.positive ? "text-emerald-400" : "text-rose-400"}`}>
-                  {stat.positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  {stat.change}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Bottom grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Room Status */}
-        <Card className="bg-slate-900/60 border-slate-800 lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+        <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Occupancy Rate
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 shadow-sm">
               <Bed className="h-4 w-4 text-cyan-400" />
-              Room Status Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              { label: "Available", count: 12, total: 40, color: "bg-emerald-500" },
-              { label: "Occupied", count: 22, total: 40, color: "bg-cyan-500" },
-              { label: "Dirty", count: 4, total: 40, color: "bg-amber-500" },
-              { label: "Maintenance", count: 2, total: 40, color: "bg-rose-500" },
-            ].map((item) => (
-              <div key={item.label} className="space-y-1">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>{item.label}</span>
-                  <span className="font-medium text-slate-300">{item.count} rooms</span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${item.color}`}
-                    style={{ width: `${(item.count / item.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity Feed */}
-        <Card className="bg-slate-900/60 border-slate-800 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
-              <Activity className="h-4 w-4 text-cyan-400" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {recentActivity.map((item, i) => (
-              <div key={i} className="flex items-start gap-3 group">
-                <div className={`mt-1.5 h-2 w-2 rounded-full flex-shrink-0 ${activityColors[item.type]}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-300 group-hover:text-white transition-colors truncate">
-                    {item.event}
-                  </p>
-                </div>
-                <span className="text-xs text-slate-500 flex-shrink-0">{item.time}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Arrivals teaser */}
-        <Card className="bg-slate-900/60 border-slate-800 lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-cyan-400" />
-              Week Ahead — Arrivals Forecast
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end gap-2 h-20">
-              {[8, 12, 6, 15, 9, 11, 7].map((val, i) => {
-                const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-                const isToday = i === 0;
-                return (
-                  <div key={i} className="flex flex-col items-center gap-1 flex-1">
-                    <div
-                      className={`w-full rounded-t-sm transition-all duration-300 ${isToday ? "bg-gradient-to-t from-cyan-600 to-cyan-400" : "bg-slate-700 hover:bg-slate-600"}`}
-                      style={{ height: `${(val / 15) * 100}%` }}
-                    />
-                    <span className={`text-[10px] font-medium ${isToday ? "text-cyan-400" : "text-slate-500"}`}>
-                      {days[i]}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="text-2xl font-bold text-white">{occupancyRate.toFixed(1)}%</div>
+            <p className="text-[10px] text-slate-500 mt-1">{inHouseCount} active in-house reservations</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Expected Arrivals
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shadow-sm">
+              <CalendarCheck className="h-4 w-4 text-emerald-400" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{arrivals.length}</div>
+            <p className="text-[10px] text-slate-500 mt-1">{departures.length} expected check-outs today</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Restaurant Covers
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20 shadow-sm">
+              <Utensils className="h-4 w-4 text-violet-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{restaurantCovers}</div>
+            <p className="text-[10px] text-slate-500 mt-1">{activeOrdersCount} active table orders in shift</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Today's Revenue
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-[#2D5016]/10 border border-[#2D5016]/20 shadow-sm">
+              <DollarSign className="h-4 w-4 text-[#C9A84C]" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">Rs. {todayRevenue.toLocaleString()}</div>
+            <p className="text-[10px] text-slate-500 mt-1">Real-time checkouts and dining receipts</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Main Grid Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Live Room Status Grid (Take up 2 cols on wide screens) */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-slate-900/40 border-slate-800/60">
+            <CardHeader className="border-b border-slate-900 pb-4">
+              <CardTitle className="text-sm font-semibold text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bed className="h-4.5 w-4.5 text-[#C9A84C]" />
+                  <span>Resort Villa & Room Status Grid</span>
+                </div>
+                <Link href="/rooms">
+                  <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-0.5">
+                    Manage Rooms <ArrowUpRight className="h-3 w-3" />
+                  </span>
+                </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <RoomStatusGrid rooms={rooms} onRoomClick={handleRoomClick} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Alerts & Operations Feed (1 col) */}
+        <div className="space-y-6">
+          
+          {/* Operations Alerts Card */}
+          <Card className="bg-slate-900/40 border-slate-800/60">
+            <CardHeader className="border-b border-slate-900 pb-4">
+              <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+                <AlertTriangle className="h-4.5 w-4.5 text-amber-500 animate-pulse" />
+                <span>Resort Operations Alerts</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3.5 max-h-[300px] overflow-y-auto scrollbar-thin">
+              {lowStockItems.length === 0 && pendingHKTasks.length === 0 && openMaintenance.length === 0 ? (
+                <div className="py-6 text-center text-slate-500 text-xs font-medium">
+                  All systems normal. No pending alerts.
+                </div>
+              ) : (
+                <>
+                  {/* Maintenance requests */}
+                  {openMaintenance.map((m) => (
+                    <div key={m.id} className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl flex items-start gap-2.5">
+                      <Hammer className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-200 block">Villa {m.room_number} Maintenance</span>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{m.description}</p>
+                      </div>
+                      <Badge className="bg-red-500/10 text-red-400 text-[8px] uppercase font-bold shrink-0">{m.category}</Badge>
+                    </div>
+                  ))}
+
+                  {/* Housekeeping task alerts */}
+                  {pendingHKTasks.map((t) => (
+                    <div key={t.id} className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2.5">
+                      <Bed className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-200 block">Room {t.room_number} Housekeeping</span>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {t.task_type.replace("_", " ")} — Assigned to: {t.assigned_to_name || "Unassigned"}
+                        </p>
+                      </div>
+                      <Badge className="bg-amber-500/10 text-amber-400 text-[8px] uppercase font-bold shrink-0">{t.status}</Badge>
+                    </div>
+                  ))}
+
+                  {/* Low Stock inventory */}
+                  {lowStockItems.map((item) => (
+                    <div key={item.id} className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-200 block">{item.name} Low Stock</span>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Currently: {item.current_stock} {item.unit} (Reorder: {item.reorder_level} {item.unit})
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Restaurant activity ratio */}
+          <Card className="bg-slate-900/40 border-slate-800/60">
+            <CardHeader className="border-b border-slate-900 pb-4">
+              <CardTitle className="text-sm font-semibold text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Utensils className="h-4.5 w-4.5 text-violet-400" />
+                  <span>Restaurant Live Ratio</span>
+                </div>
+                <Link href="/pos">
+                  <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-0.5">
+                    POS Terminal <ArrowUpRight className="h-3 w-3" />
+                  </span>
+                </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span>Occupied Tables</span>
+                <span className="font-semibold text-slate-200">{occupiedTables} / {totalTables} tables</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-950 overflow-hidden">
+                <div
+                  className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                  style={{ width: `${totalTables > 0 ? (occupiedTables / totalTables) * 100 : 0}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+        </div>
+      </div>
+
+      {/* Today's Arrivals expected list */}
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="bg-slate-900/40 border-slate-800/60">
+          <CardHeader className="border-b border-slate-900 pb-4">
+            <CardTitle className="text-sm font-semibold text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarCheck className="h-4.5 w-4.5 text-emerald-400" />
+                <span>Expected Arrivals Today</span>
+              </div>
+              <Link href="/frontdesk">
+                <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-0.5">
+                  Front Desk Desk <ArrowUpRight className="h-3 w-3" />
+                </span>
+              </Link>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 overflow-x-auto">
+            {arrivals.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 text-xs font-medium">
+                No expected arriving guests remaining today.
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-500 text-[10px] font-bold uppercase tracking-wider pb-2">
+                    <th className="py-2.5">Guest</th>
+                    <th>Room Assigned</th>
+                    <th>Proximity</th>
+                    <th>Booking Source</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-xs">
+                  {arrivals.map((arr) => (
+                    <tr key={arr.id} className="text-slate-300 hover:text-white hover:bg-slate-900/10">
+                      <td className="py-3 font-semibold text-slate-100">
+                        {arr.guest.first_name} {arr.guest.last_name}
+                      </td>
+                      <td>
+                        {arr.room?.room_number ? `Room ${arr.room.room_number} (${arr.room.room_type?.name})` : "Unassigned"}
+                      </td>
+                      <td className="text-slate-400">
+                        {arr.total_nights} nights
+                      </td>
+                      <td className="capitalize text-slate-400">
+                        {arr.booking_source.replace("_", " ")}
+                      </td>
+                      <td className="text-right">
+                        <Link href="/frontdesk">
+                          <Button size="xs" className="bg-[#2D5016] text-[#FAFAF7] hover:bg-[#1E3A0E] text-[10px]">
+                            Check-In Desk
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Slide Drawer room detail panel */}
+      <RoomDetailSheet
+        room={selectedRoom}
+        open={isSheetOpen}
+        onOpenChange={setIsSheetOpen}
+        onSuccess={loadDashboardData}
+      />
     </div>
+  );
+}
+
+// Custom simple Badge representation to prevent import clashes
+function Badge({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${className}`}>
+      {children}
+    </span>
   );
 }

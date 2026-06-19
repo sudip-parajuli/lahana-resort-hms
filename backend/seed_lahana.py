@@ -11,9 +11,14 @@ from django.db import transaction
 from django.utils import timezone
 from django_tenants.utils import tenant_context
 
+from django.conf import settings
 from apps.tenants.models import Client, Domain
-from apps.subscriptions.models import SubscriptionPlan, TenantSubscription, SubscriptionStatus
 from apps.accounts.models import User, UserRole
+
+is_single_tenant = getattr(settings, "DEPLOYMENT_MODE", "saas") == "single_tenant"
+
+if not is_single_tenant:
+    from apps.subscriptions.models import SubscriptionPlan, TenantSubscription, SubscriptionStatus
 
 
 def seed_lahana():
@@ -22,21 +27,13 @@ def seed_lahana():
 
     if not tenant:
         print("Creating tenant 'lahana_resort'...")
-        plan = SubscriptionPlan.objects.filter(slug="enterprise", is_active=True).first()
-        if not plan:
-            plan = SubscriptionPlan.objects.create(
-                name="Enterprise",
-                slug="enterprise",
-                price_monthly=Decimal("12000.00"),
-                is_active=True
-            )
         
         tenant = Client.objects.create(
             schema_name=schema_name,
             name="Lahana Resort",
             contact_email="manager@lahana.com",
             contact_phone="9801234567",
-            subscription_plan="enterprise",
+            subscription_plan="private_install" if is_single_tenant else "enterprise",
             is_active=True
         )
         
@@ -46,15 +43,24 @@ def seed_lahana():
             is_primary=True
         )
         
-        today = timezone.localdate()
-        TenantSubscription.objects.create(
-            tenant=tenant,
-            plan=plan,
-            status=SubscriptionStatus.ACTIVE,
-            current_period_start=today,
-            current_period_end=today + timedelta(days=30),
-            next_billing_date=today + timedelta(days=30)
-        )
+        if not is_single_tenant:
+            plan = SubscriptionPlan.objects.filter(slug="enterprise", is_active=True).first()
+            if not plan:
+                plan = SubscriptionPlan.objects.create(
+                    name="Enterprise",
+                    slug="enterprise",
+                    price_monthly=Decimal("12000.00"),
+                    is_active=True
+                )
+            today = timezone.localdate()
+            TenantSubscription.objects.create(
+                tenant=tenant,
+                plan=plan,
+                status=SubscriptionStatus.ACTIVE,
+                current_period_start=today,
+                current_period_end=today + timedelta(days=30),
+                next_billing_date=today + timedelta(days=30)
+            )
         print("Tenant 'lahana_resort' created.")
     else:
         print("Tenant 'lahana_resort' already exists.")

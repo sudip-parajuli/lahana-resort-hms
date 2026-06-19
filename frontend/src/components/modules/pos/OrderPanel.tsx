@@ -11,6 +11,8 @@ import { posApi } from "@/lib/api/pos";
 import { frontdeskApi } from "@/lib/api/frontdesk";
 import { PaymentModal } from "./PaymentModal";
 import type { Order, DiningTable, Reservation, OrderType, OrderItemStatus } from "@/lib/types";
+import { queueOfflineOrder } from "@/lib/offlineQueue";
+import { toast } from "sonner";
 
 interface OrderPanelProps {
   activeOrder: Order | null;
@@ -85,21 +87,55 @@ export function OrderPanel({
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) return;
     setIsSubmitting(true);
-    try {
-      const payload = {
-        table_id: selectedTable?.id || null,
-        reservation_id: selectedResId !== "none" ? parseInt(selectedResId) : null,
-        order_type: orderType,
-        notes: notes,
-        discount_amount: discountAmount,
-        items: cartItems.map((c) => ({
-          menu_item_id: c.id,
-          quantity: c.quantity,
-          modifiers: {},
-          notes: "",
-        })),
-      };
 
+    const payload = {
+      table_id: selectedTable?.id || null,
+      reservation_id: selectedResId !== "none" ? parseInt(selectedResId) : null,
+      order_type: orderType,
+      notes: notes,
+      discount_amount: discountAmount,
+      items: cartItems.map((c) => ({
+        menu_item_id: c.id,
+        quantity: c.quantity,
+        modifiers: {},
+        notes: "",
+      })),
+    };
+
+    // If browser is offline, queue directly
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      try {
+        await queueOfflineOrder(payload);
+        clearCart();
+        setNotes("");
+        setDiscountAmount("0");
+        toast.success("Offline Mode: Order queued locally. It will auto-sync when WiFi reconnects.");
+        onOrderCreated({
+          id: -Date.now(),
+          status: "pending" as any,
+          table_number: selectedTable?.table_number || "",
+          subtotal: subtotal.toString(),
+          total_amount: total.toString(),
+          discount_amount: discount,
+          order_type: orderType,
+          items: cartItems.map((c) => ({
+            id: -c.id,
+            menu_item: { id: c.id, name: c.name, price: c.price.toString() },
+            quantity: c.quantity,
+            unit_price: c.price.toString(),
+            status: "pending" as any,
+          })),
+        } as any);
+      } catch (err) {
+        console.error("Failed to queue offline", err);
+        toast.error("Failed to save offline order.");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    try {
       const res = await posApi.createOrder(payload);
       clearCart();
       setNotes("");
@@ -107,7 +143,37 @@ export function OrderPanel({
       onOrderCreated(res.data);
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || "Failed to place order.");
+      // Fallback for unexpected network loss during connection
+      if (!err.response || err.code === "ERR_NETWORK") {
+        try {
+          await queueOfflineOrder(payload);
+          clearCart();
+          setNotes("");
+          setDiscountAmount("0");
+          toast.warning("Network connection lost. Order queued offline.");
+          onOrderCreated({
+            id: -Date.now(),
+            status: "pending" as any,
+            table_number: selectedTable?.table_number || "",
+            subtotal: subtotal.toString(),
+            total_amount: total.toString(),
+            discount_amount: discount,
+            order_type: orderType,
+            items: cartItems.map((c) => ({
+              id: -c.id,
+              menu_item: { id: c.id, name: c.name, price: c.price.toString() },
+              quantity: c.quantity,
+              unit_price: c.price.toString(),
+              status: "pending" as any,
+            })),
+          } as any);
+        } catch (queueErr) {
+          console.error("Failed to queue offline", queueErr);
+          toast.error("Failed to save offline order.");
+        }
+      } else {
+        alert(err.response?.data?.error || "Failed to place order.");
+      }
     } finally {
       setIsSubmitting(false);
     }

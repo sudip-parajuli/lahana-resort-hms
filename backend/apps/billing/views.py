@@ -11,7 +11,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from apps.accounts.permissions import IsPropertyManager, IsAnyStaff
-from .models import Invoice, InvoiceItem, Payment, InvoiceStatus, PaymentMethod
+from .models import Invoice, InvoiceItem, Payment, InvoiceStatus, PaymentMethod, SplitPayment
 from .serializers import InvoiceSerializer, InvoiceItemSerializer, PaymentSerializer
 
 
@@ -27,7 +27,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     ordering_fields = ["created_at", "total_amount", "paid_amount"]
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve", "pdf"]:
+        if self.action in ["list", "retrieve", "pdf", "payments", "split"]:
             return [IsAnyStaff()]
         return [IsPropertyManager()]
 
@@ -67,6 +67,63 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
+    def split(self, request, pk=None):
+        """
+        Processes a group check-out split payment allocation.
+        """
+        invoice = self.get_object()
+        splits = request.data.get("splits", [])
+
+        if not splits:
+            return Response({"error": "splits list is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce that the allocated sum matches the remaining balance
+        total_split_amount = sum(Decimal(str(item.get("amount", 0))) for item in splits)
+        if total_split_amount != invoice.balance_due:
+            return Response(
+                {"error": f"Total split allocations (Rs. {total_split_amount}) must equal balance due (Rs. {invoice.balance_due})."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            for item in splits:
+                amount = Decimal(str(item.get("amount", 0)))
+                method = item.get("payment_method", PaymentMethod.CASH)
+                ref = item.get("reference", "")
+                desc = item.get("description", "Group Split Payment")
+
+                # Create audit SplitPayment record
+                SplitPayment.objects.create(
+                    invoice=invoice,
+                    amount=amount,
+                    payment_method=method,
+                    reference=ref,
+                    description=desc,
+                )
+
+                # Create standard Payment record for accounting flow
+                Payment.objects.create(
+                    invoice=invoice,
+                    amount=amount,
+                    payment_method=method,
+                    reference_number=ref,
+                    received_by=request.user,
+                    notes=desc,
+                )
+
+                invoice.paid_amount += amount
+
+            # Recalculate balance and status
+            invoice.save()
+            if invoice.balance_due <= 0:
+                invoice.status = InvoiceStatus.PAID
+            elif invoice.paid_amount > 0:
+                invoice.status = InvoiceStatus.PARTIALLY_PAID
+            invoice.save()
+
+        return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
     def void(self, request, pk=None):
         """
         Voids the current invoice.
@@ -89,13 +146,27 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # Prepare context for the printable HTML invoice
         from django.template.loader import render_to_string
         
+        # Get dynamic property information
+        from apps.properties.models import Property
+        from apps.properties.utils import get_logo_base64
+
+        prop = Property.objects.first()
+        company_name = prop.name if prop else "Lahana Resort"
+        company_address = f"{prop.address}, {prop.city}, {prop.country}" if prop else "Kathmandu, Nepal"
+        company_phone = prop.phone if prop else "+977-1-4XXXXXX"
+        company_email = prop.email if prop else "info@lahanaresort.com"
+        company_pan = prop.pan_number or prop.vat_number or "601234567"
+        logo_url = get_logo_base64()
+
         lang = request.query_params.get("lang") or (request.user.preferred_language if hasattr(request.user, "preferred_language") else "en")
         context = {
             "invoice": invoice,
-            "company_name": "SIA HMS Resorts",
-            "company_pan": "601234567",  # Demo PAN Number
-            "company_address": "Lakeside, Pokhara, Nepal",
-            "company_phone": "+977-61-460000",
+            "company_name": company_name,
+            "company_pan": company_pan,
+            "company_address": company_address,
+            "company_phone": company_phone,
+            "company_email": company_email,
+            "logo_url": logo_url,
             "fiscal_year": invoice.fiscal_year,
             "lang": lang,
         }

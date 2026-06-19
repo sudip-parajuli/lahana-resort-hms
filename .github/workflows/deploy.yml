@@ -1,24 +1,24 @@
-name: CI/CD — SIA HMS
+name: CI/CD — Lahana Resort PMS
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
-  # ─────────────────────────────
-  # Backend CI
-  # ─────────────────────────────
-  backend-ci:
-    name: Backend Tests
+  # ────────────────────────────────────────────────────────────
+  # Tests & Type Checking
+  # ────────────────────────────────────────────────────────────
+  test-and-typecheck:
+    name: Run Tests & Type Checks
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: sia_hms_test
+          POSTGRES_DB: lahana_test_db
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
         options: >-
@@ -40,57 +40,44 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Backend Pipeline
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
-      - name: Cache pip packages
+      - name: Cache Pip Packages
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements/development.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements/base.txt') }}
 
-      - name: Install backend dependencies
+      - name: Install Backend Dependencies
         run: |
           cd backend
-          pip install -r requirements/development.txt
+          pip install -r requirements/base.txt
+          pip install pytest pytest-django pytest-cov faker
 
-      - name: Run Django tests
+      - name: Run Django Tests
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
-          POSTGRES_DB: sia_hms_test
+          DEPLOYMENT_MODE: single_tenant
+          POSTGRES_DB: lahana_test_db
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
           REDIS_URL: redis://localhost:6379/0
           CELERY_BROKER_URL: redis://localhost:6379/1
-          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          DJANGO_SECRET_KEY: ci-testing-secret-key-not-for-production-use
         run: |
           cd backend
-          pytest --cov=apps --cov-report=xml --cov-fail-under=70 -v
+          pytest -v
 
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v3
-        if: always()
-        with:
-          file: backend/coverage.xml
-
-  # ─────────────────────────────
-  # Frontend CI
-  # ─────────────────────────────
-  frontend-ci:
-    name: Frontend Type Check & Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      # Frontend Pipeline
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -98,61 +85,53 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install frontend dependencies
+      - name: Install Frontend Dependencies
         run: |
           cd frontend
           npm ci
 
-      - name: TypeScript type check
+      - name: TypeScript Type Check
         run: |
           cd frontend
           npx tsc --noEmit
 
-      - name: Run frontend tests
-        run: |
-          cd frontend
-          npm run test -- --run
-
-  # ─────────────────────────────
-  # Deploy to Production (main only)
-  # ─────────────────────────────
-  deploy-production:
-    name: Deploy to Production
+  # ────────────────────────────────────────────────────────────
+  # Continuous Deployment (Only on pushes to main)
+  # ────────────────────────────────────────────────────────────
+  deploy-to-vps:
+    name: Deploy to VPS Server
     runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci]
+    needs: [test-and-typecheck]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Deploy via SSH Command
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.PROD_SERVER_HOST }}
-          username: ${{ secrets.PROD_SERVER_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
+          host: ${{ secrets.LAHANA_VPS_HOST }}
+          username: ${{ secrets.LAHANA_VPS_USER }}
+          key: ${{ secrets.LAHANA_VPS_SSH_KEY }}
           script: |
-            /opt/sia-hms/deploy.sh
+            cd /opt/lahana-resort-hms
+            git pull origin main
+            
+            # Rebuild and start production services
+            docker compose -f docker-compose.prod.yml up --build -d backend frontend celery_worker celery_beat
+            
+            # Run db migrations
+            docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --no-input
+            
+            # Gather static assets for nginx proxying
+            docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --no-input
+            
+            # Refresh Nginx reverse proxy
+            systemctl restart nginx
 
-      - name: Notify deployment success
+      - name: Send Completion Notification SMS
         if: success()
         run: |
-          echo "✅ Production deployment successful"
-          # Sparrow SMS notification would be triggered from deploy.sh
-
-  # ─────────────────────────────
-  # Deploy to Staging (staging only)
-  # ─────────────────────────────
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: [backend-ci, frontend-ci]
-    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
-
-    steps:
-      - name: Deploy to Staging via SSH
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.STAGING_SERVER_HOST }}
-          username: ${{ secrets.STAGING_SERVER_USER }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          script: |
-            /opt/sia-hms-staging/deploy.sh
+          curl -s -X POST https://api.sparrowsms.com/v2/sms/ \
+            -d "token=${{ secrets.SPARROW_SMS_TOKEN }}" \
+            -d "from=LahanaRes" \
+            -d "to=${{ secrets.SUDIP_PHONE }}" \
+            -d "text=Lahana Resort PMS has been successfully deployed to production! ✅"

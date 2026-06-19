@@ -385,6 +385,18 @@ export default function NewBookingPage() {
                         <span>Total Stay Amount</span>
                         <span>Rs. {Number(pricingEstimate.total_price).toLocaleString()}</span>
                       </div>
+                      {Number(pricingEstimate.advance_deposit_percent || 0) > 0 && (
+                        <div className="pt-2 mt-1 border-t border-slate-900/50 space-y-1">
+                          <div className="flex justify-between text-emerald-400 font-semibold">
+                            <span>Deposit Required Now ({pricingEstimate.advance_deposit_percent}%)</span>
+                            <span>Rs. {Number(pricingEstimate.deposit_amount).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-400">
+                            <span>Due at Check-in</span>
+                            <span>Rs. {(Number(pricingEstimate.total_price) - Number(pricingEstimate.deposit_amount)).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -595,6 +607,18 @@ export default function NewBookingPage() {
                     <span>Total Stay Amount</span>
                     <span>Rs. {Number(pricingEstimate.total_price).toLocaleString()}</span>
                   </div>
+                  {Number(pricingEstimate.advance_deposit_percent || 0) > 0 && (
+                    <div className="pt-2 mt-1.5 border-t border-slate-900/50 space-y-1">
+                      <div className="flex justify-between text-emerald-400 font-semibold">
+                        <span>Deposit Required Now ({pricingEstimate.advance_deposit_percent}%)</span>
+                        <span>Rs. {Number(pricingEstimate.deposit_amount).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Due at Check-in</span>
+                        <span>Rs. {(Number(pricingEstimate.total_price) - Number(pricingEstimate.deposit_amount)).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

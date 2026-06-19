@@ -103,11 +103,66 @@ class ReservationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
             
-        reservation.status = ReservationStatus.CANCELLED
-        reservation.cancelled_at = timezone.now()
-        reservation.cancellation_reason = reason
-        reservation.save()
+        from decimal import Decimal
+        prop = reservation.room.room_type.property
+        days_until_checkin = (reservation.check_in_date - timezone.localdate()).days
         
+        refund_amount = Decimal("0.00")
+        refund_percent = 0
+
+        # Calculate refund if a deposit was paid
+        if reservation.deposit_paid and reservation.deposit_amount > 0:
+            if days_until_checkin >= prop.free_cancellation_days:
+                refund_percent = 100
+            else:
+                refund_percent = prop.cancellation_refund_percent
+            
+            refund_amount = (reservation.deposit_amount * Decimal(str(refund_percent)) / Decimal("100.00")).quantize(Decimal("0.01"))
+
+        with transaction.atomic():
+            reservation.status = ReservationStatus.CANCELLED
+            reservation.cancelled_at = timezone.now()
+            reservation.cancellation_reason = reason
+            reservation.save()
+
+            if refund_amount > 0:
+                # Log negative payment on the advance deposit invoice to balance it
+                deposit_invoice = reservation.invoices.filter(notes="Advance deposit invoice").first()
+                if deposit_invoice:
+                    from apps.billing.models import Payment, PaymentMethod
+                    from apps.accounts.models import UserRole
+                    
+                    received_by_user = request.user if (request.user and request.user.is_authenticated) else None
+                    if not received_by_user:
+                        from django.contrib.auth import get_user_model
+                        User = get_user_model()
+                        received_by_user = User.objects.filter(role=UserRole.PROPERTY_MANAGER).first()
+
+                    Payment.objects.create(
+                        invoice=deposit_invoice,
+                        amount=-refund_amount,
+                        payment_method=PaymentMethod.CASH,
+                        reference_number="REF-REFUND",
+                        received_by=received_by_user,
+                        notes=f"Cancellation refund ({refund_percent}%)",
+                    )
+                    deposit_invoice.paid_amount -= refund_amount
+                    deposit_invoice.save()
+
+        # Send Sparrow SMS notification
+        from apps.notifications.sms import send_sms
+        if refund_amount > 0:
+            msg = f"Dear {reservation.guest.first_name}, your booking {reservation.id} at {prop.name} has been cancelled. Refund of Rs. {refund_amount} has been processed."
+        else:
+            msg = f"Dear {reservation.guest.first_name}, your booking {reservation.id} at {prop.name} has been cancelled."
+        
+        try:
+            send_sms(reservation.guest.phone, msg)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send cancellation SMS: {e}")
+
         return Response(ReservationSerializer(reservation).data)
 
     @action(detail=False, methods=["get"])
@@ -158,12 +213,21 @@ class ReservationViewSet(viewsets.ModelViewSet):
 
         for rt in unique_room_types:
             pricing = calculate_price(rt, check_in, check_out)
+            prop = rt.property
+            deposit_percent = prop.advance_deposit_percent
+            total_amount = pricing["total_amount"]
+            from decimal import Decimal
+            deposit_amount = (total_amount * Decimal(str(deposit_percent)) / Decimal("100.00")).quantize(Decimal("0.01"))
             pricing_estimates[rt.id] = {
                 "base_price": str(pricing["base_amount"]),
                 "tax_price": str(pricing["tax_amount"]),
                 "total_price": str(pricing["total_amount"]),
                 "nights": pricing["nights"],
                 "breakdown": pricing["breakdown"],
+                "advance_deposit_percent": deposit_percent,
+                "deposit_amount": str(deposit_amount),
+                "free_cancellation_days": prop.free_cancellation_days,
+                "cancellation_refund_percent": prop.cancellation_refund_percent,
             }
 
         return Response({
@@ -209,6 +273,11 @@ class PublicAvailabilityView(APIView):
         for rt in available_types:
             pricing = calculate_price(rt, check_in, check_out)
             rt_serializer = RoomTypeSerializer(rt, context={"request": request})
+            prop = rt.property
+            deposit_percent = prop.advance_deposit_percent
+            total_amount = pricing["total_amount"]
+            from decimal import Decimal
+            deposit_amount = (total_amount * Decimal(str(deposit_percent)) / Decimal("100.00")).quantize(Decimal("0.01"))
             results.append({
                 "room_type": rt_serializer.data,
                 "pricing": {
@@ -217,6 +286,10 @@ class PublicAvailabilityView(APIView):
                     "total_price": str(pricing["total_amount"]),
                     "nights": pricing["nights"],
                     "breakdown": pricing["breakdown"],
+                    "advance_deposit_percent": deposit_percent,
+                    "deposit_amount": str(deposit_amount),
+                    "free_cancellation_days": prop.free_cancellation_days,
+                    "cancellation_refund_percent": prop.cancellation_refund_percent,
                 }
             })
 
@@ -295,6 +368,50 @@ class PublicBookingCreateView(APIView):
         serializer = ReservationSerializer(data=res_data)
         if serializer.is_valid():
             reservation = serializer.save()
+
+            # 5. Send SMS Notification via Sparrow SMS
+            try:
+                from apps.notifications.sms import send_sms
+                sms_message = (
+                    f"Dear {guest.first_name} {guest.last_name}, thank you for booking with Lahana Resort! "
+                    f"Your booking reference is #{reservation.id} for {reservation.check_in_date} to {reservation.check_out_date}."
+                )
+                send_sms(guest.phone, sms_message)
+            except Exception as sms_err:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to send booking SMS: {sms_err}")
+
+            # 6. Send Email Notification via SMTP
+            if guest.email:
+                try:
+                    from django.core.mail import send_mail
+                    from django.conf import settings
+                    subject = f"Booking Request Received - Lahana Resort"
+                    email_body = (
+                        f"Dear {guest.first_name} {guest.last_name},\n\n"
+                        f"Thank you for your stay reservation request at Lahana Resort!\n\n"
+                        f"Here is a summary of your stay details:\n"
+                        f"Booking Reference: #{reservation.id}\n"
+                        f"Check-in Date: {reservation.check_in_date}\n"
+                        f"Check-out Date: {reservation.check_out_date}\n"
+                        f"Room Class: {selected_room.room_type.name}\n"
+                        f"Adults: {reservation.adults}\n"
+                        f"Total Stay Amount: NPR {reservation.total_amount:,.2f} (incl. VAT)\n\n"
+                        f"We look forward to welcoming you soon.\n\n"
+                        f"Warm regards,\n"
+                        f"Lahana Resort Team"
+                    )
+                    send_mail(
+                        subject,
+                        email_body,
+                        settings.DEFAULT_FROM_EMAIL or "noreply@lahanaresort.com",
+                        [guest.email],
+                        fail_silently=True,
+                    )
+                except Exception as mail_err:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to send booking email: {mail_err}")
+
             return Response(ReservationSerializer(reservation).data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

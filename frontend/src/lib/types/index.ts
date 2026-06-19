@@ -194,10 +194,16 @@ export interface Reservation {
   discount_amount: string;
   total_amount: string;
   deposit_paid: boolean;
+  deposit_amount: string;
   special_requests?: string;
   created_by?: number;
   created_at?: string;
   updated_at?: string;
+  cancellation_policy_details?: {
+    free_cancellation_days: number;
+    cancellation_refund_percent: number;
+    advance_deposit_percent: number;
+  };
 }
 
 // ─────────────────────────────

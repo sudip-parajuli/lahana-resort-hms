@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 import { frontdeskApi } from "@/lib/api/frontdesk";
+import { billingApi } from "@/lib/api/billing";
 import { OccupancyBar } from "@/components/modules/frontdesk/OccupancyBar";
 import { GuestCard } from "@/components/modules/frontdesk/GuestCard";
 import { CheckInModal } from "@/components/modules/frontdesk/CheckInModal";
@@ -72,9 +73,28 @@ export default function FrontDeskPage() {
     payment_method: string;
     feedback_rating?: number;
     feedback_comment?: string;
+    splits?: Array<{
+      payment_method: string;
+      amount: string;
+      reference: string;
+      description: string;
+    }>;
   }) => {
     try {
-      const res = await frontdeskApi.checkOut(payload);
+      const checkoutPayload = {
+        reservation_id: payload.reservation_id,
+        additional_charges: payload.additional_charges,
+        payment_method: payload.payment_method,
+        feedback_rating: payload.feedback_rating,
+        feedback_comment: payload.feedback_comment,
+      };
+      const res = await frontdeskApi.checkOut(checkoutPayload);
+      
+      if (payload.payment_method === "split" && payload.splits && payload.splits.length > 0) {
+        const invoiceId = res.data.invoice_id;
+        await billingApi.splitInvoice(invoiceId, { splits: payload.splits });
+      }
+
       toast.success(`Check-out completed! Invoice settled for Rs. ${res.data.total_amount}`);
       loadData();
     } catch (err: any) {

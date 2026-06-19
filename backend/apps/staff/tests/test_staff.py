@@ -144,6 +144,7 @@ class TestStaffOperations:
         url = reverse("staffmember-detail", kwargs={"pk": staff.id})
         payload = {
             "user": {
+                "email": "officer@stafftest.com",
                 "first_name": "Sita Updated",
                 "last_name": "Sharma",
                 "phone": "9800000000",
@@ -159,6 +160,7 @@ class TestStaffOperations:
         }
         
         response = tenant_auth_client.put(url, payload, format="json")
+        print("RESPONSE DATA:", response.data)
         assert response.status_code == status.HTTP_200_OK
         assert response.data["designation"] == "Senior HR Officer"
         assert response.data["user"]["first_name"] == "Sita Updated"

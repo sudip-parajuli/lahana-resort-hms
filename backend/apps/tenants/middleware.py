@@ -1,10 +1,11 @@
 """
-SIA HMS — Impersonation Middleware
-Allows Super Admins to dynamically route requests based on the tenant_schema claim in JWT.
+SIA HMS — Tenants Middleware
+Includes ImpersonationMiddleware for SaaS mode and SingleTenantMiddleware for private installation mode.
 """
 
 from rest_framework_simplejwt.tokens import AccessToken
 from django.db import connection
+from django.conf import settings
 from apps.tenants.models import Client
 
 class ImpersonationMiddleware:
@@ -17,10 +18,6 @@ class ImpersonationMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        print("MIDDLEWARE DEBUG:")
-        print("  Host:", request.get_host())
-        print("  Tenant:", getattr(request, 'tenant', None))
-        print("  URLConf:", getattr(request, 'urlconf', None))
         raw_token = None
         header = request.META.get("HTTP_AUTHORIZATION")
         if header and header.startswith("Bearer "):
@@ -42,5 +39,29 @@ class ImpersonationMiddleware:
                         request.tenant = tenant
             except Exception:
                 pass
+
+        return self.get_response(request)
+
+
+class SingleTenantMiddleware:
+    """
+    Middleware that bypasses subdomain-based tenant routing and instead forces
+    all DB connections and requests to run under a single configured schema.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        schema_name = getattr(settings, 'SINGLE_TENANT_SCHEMA', 'lahana')
+        try:
+            tenant = Client.objects.filter(schema_name=schema_name, is_active=True).first()
+            if tenant:
+                connection.set_tenant(tenant)
+                request.tenant = tenant
+            else:
+                connection.set_schema_to_public()
+        except Exception:
+            # During initial migrations, Client table might not exist yet
+            connection.set_schema_to_public()
 
         return self.get_response(request)

@@ -6,7 +6,7 @@ Handles Invoice, InvoiceItem, and Payment serialization.
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from .models import Invoice, InvoiceItem, Payment
+from .models import Invoice, InvoiceItem, Payment, SplitPayment
 
 User = get_user_model()
 
@@ -38,9 +38,26 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "received_by", "created_at"]
 
 
+class SplitPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SplitPayment
+        fields = [
+            "id",
+            "invoice",
+            "description",
+            "amount",
+            "payment_method",
+            "paid_at",
+            "reference",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
+    split_payments = SplitPaymentSerializer(many=True, read_only=True)
     
     # Guest details if tied to reservation
     guest_name = serializers.CharField(source="reservation.guest.full_name", read_only=True)
@@ -72,6 +89,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "notes",
             "items",
             "payments",
+            "split_payments",
             "created_at",
             "updated_at",
         ]

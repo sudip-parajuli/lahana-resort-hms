@@ -4,6 +4,9 @@ SIA HMS — Production Settings
 from .base import *  # noqa
 from decouple import config
 
+IS_SAAS = False
+SINGLE_TENANT_MODE = True
+
 DEBUG = False
 
 # Security

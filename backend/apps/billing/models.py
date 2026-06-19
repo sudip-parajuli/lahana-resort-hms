@@ -99,6 +99,12 @@ class Invoice(models.Model):
         self.balance_due = total - paid
         super().save(*args, **kwargs)
 
+        # Update reservation deposit state if deposit invoice is fully paid
+        if self.reservation and self.notes == "Advance deposit invoice":
+            if self.balance_due <= 0 and self.total_amount > 0:
+                self.reservation.deposit_paid = True
+                self.reservation.save()
+
     @property
     def due_amount(self):
         return self.balance_due
@@ -187,3 +193,32 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment of Rs. {self.amount} for {self.invoice.invoice_number} via {self.payment_method}"
+
+
+class SplitPayment(models.Model):
+    """
+    Tracks audit details of split payments for group checkouts.
+    """
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.CASCADE,
+        related_name="split_payments",
+    )
+    description = models.CharField(max_length=255, blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(
+        max_length=25,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+    )
+    paid_at = models.DateTimeField(default=timezone.now)
+    reference = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Split Payment"
+        verbose_name_plural = "Split Payments"
+        ordering = ["-paid_at"]
+
+    def __str__(self):
+        return f"Split Payment of Rs. {self.amount} for {self.invoice.invoice_number}"

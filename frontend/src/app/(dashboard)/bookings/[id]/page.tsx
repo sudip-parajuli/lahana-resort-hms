@@ -49,6 +49,34 @@ export default function BookingDetailPage() {
     fetchBooking();
   }, [id]);
 
+  const getCancellationRefundPreview = () => {
+    if (!booking) return null;
+    const policies = booking.cancellation_policy_details;
+    if (!policies) return null;
+
+    const checkInDate = new Date(booking.check_in_date);
+    const today = new Date();
+    // Normalize dates to midnight
+    checkInDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = checkInDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    const freeDays = policies.free_cancellation_days;
+    const refundPercent = diffDays >= freeDays ? 100 : policies.cancellation_refund_percent;
+    const depositAmount = Number(booking.deposit_amount || 0);
+    const refundAmount = (depositAmount * refundPercent) / 100;
+
+    return {
+      diffDays,
+      freeDays,
+      refundPercent,
+      refundAmount,
+      depositAmount,
+    };
+  };
+
   const handleConfirm = async () => {
     if (!booking) return;
     setIsSubmitting(true);
@@ -248,6 +276,57 @@ export default function BookingDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {booking.cancellation_policy_details && (
+            <Card className="bg-slate-900/40 border-slate-800 shadow-md">
+              <CardHeader className="pb-3 border-b border-slate-900">
+                <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-cyan-400" />
+                  Cancellation & Refund Policy
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3.5 text-xs">
+                <div className="grid grid-cols-2 gap-4 text-slate-300">
+                  <div>
+                    <span className="text-slate-500 block">Free Cancellation Window</span>
+                    <span className="font-semibold text-slate-200">
+                      {booking.cancellation_policy_details.free_cancellation_days} days or more
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Late Cancellation Refund</span>
+                    <span className="font-semibold text-slate-200">
+                      {booking.cancellation_policy_details.cancellation_refund_percent}% of deposit
+                    </span>
+                  </div>
+                </div>
+
+                {["pending", "confirmed"].includes(booking.status) && (() => {
+                  const preview = getCancellationRefundPreview();
+                  if (!preview) return null;
+                  return (
+                    <div className="mt-2 p-3 rounded-lg bg-slate-950/50 border border-slate-900/50 space-y-2">
+                      <div className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        Refund Estimate (If Cancelled Today)
+                      </div>
+                      <div className="flex justify-between text-slate-300">
+                        <span>Check-in Proximity</span>
+                        <span>{preview.diffDays > 0 ? `${preview.diffDays} days before` : "Today/Past"}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-300">
+                        <span>Refund Rate</span>
+                        <span>{preview.refundPercent}% of deposit</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold text-emerald-400 pt-1.5 border-t border-slate-900/50">
+                        <span>Estimated Refund</span>
+                        <span>Rs. {preview.refundAmount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

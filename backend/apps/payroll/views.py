@@ -125,7 +125,7 @@ class PayrollEntryViewSet(viewsets.ModelViewSet):
                 )
         
         # Generate QR verification data containing verification details
-        qr_data = f"SIA-HMS-PAYSLIP:{entry.staff.user.email}:{entry.period.month}/{entry.period.year}:{entry.net_salary}"
+        qr_data = f"LAHA-HMS-PAYSLIP:{entry.staff.user.email}:{entry.period.month}/{entry.period.year}:{entry.net_salary}"
         qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_data}"
         
         # Render HTML template to string
@@ -135,13 +135,22 @@ class PayrollEntryViewSet(viewsets.ModelViewSet):
         allowance_sum = sum(float(item.get("amount", 0)) for item in entry.allowances)
         deduction_sum = sum(float(item.get("amount", 0)) for item in entry.deductions)
         
+        # Get dynamic property details
+        from apps.properties.models import Property
+        from apps.properties.utils import get_logo_base64
+        
+        prop = Property.objects.first()
+        company_name = prop.name if prop else "Lahana Resort"
+        logo_url = get_logo_base64()
+        
         lang = request.query_params.get("lang") or (request.user.preferred_language if hasattr(request.user, "preferred_language") else "en")
         context = {
             "entry": entry,
             "qr_code_url": qr_code_url,
             "allowances_total": allowance_sum,
             "deductions_total": deduction_sum,
-            "company_name": "SIA HMS Hotels",
+            "company_name": company_name,
+            "logo_url": logo_url,
             "lang": lang,
         }
         

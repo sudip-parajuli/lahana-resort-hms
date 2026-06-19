@@ -63,5 +63,18 @@
     "inspect": "Inspected",
     "update_status": "Update Status",
     "room_number": "Room Number"
+  },
+  "Menu": {
+    "welcome": "Welcome to",
+    "table": "Table",
+    "title": "Digital Menu",
+    "call_waiter": "Call Waiter",
+    "calling": "Calling...",
+    "waiter_notified": "Waiter has been called!",
+    "veg": "Veg",
+    "vegan": "Vegan",
+    "allergens": "Contains Allergens",
+    "empty": "No items found in this category.",
+    "currency": "Rs."
   }
 }

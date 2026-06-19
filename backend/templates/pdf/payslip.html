@@ -140,8 +140,11 @@
 <body>
     <div class="header">
         <div class="payslip-title">{% if lang == 'ne' %}तलब भुक्तानी पर्ची{% else %}Salary Payslip{% endif %}</div>
+        {% if logo_url %}
+        <img src="{{ logo_url }}" style="height: 45px; float: left; margin-right: 10px;" alt="Logo">
+        {% endif %}
         <div class="company-name">{{ company_name }}</div>
-        <div class="company-tag">SIA Enterprises Multi-Tenant Hospitality Operations</div>
+        <div class="company-tag">Staff Payroll System</div>
         <div class="clear"></div>
     </div>
 

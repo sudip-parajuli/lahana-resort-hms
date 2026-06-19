@@ -3,6 +3,17 @@ SIA HMS — Development Settings
 """
 from .base import *  # noqa
 
+# Workaround for Windows environments without GTK/GObject libraries installed
+import sys
+from unittest.mock import MagicMock
+try:
+    import weasyprint
+except OSError:
+    mock_weasyprint = MagicMock()
+    mock_weasyprint.HTML = MagicMock()
+    mock_weasyprint.CSS = MagicMock()
+    sys.modules['weasyprint'] = mock_weasyprint
+
 DEBUG = True
 
 # Use local SQLite for quick dev if needed, or full PostgreSQL

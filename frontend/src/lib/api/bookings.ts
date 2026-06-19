@@ -8,7 +8,7 @@ export const bookingsApi = {
     check_out: string;
     adults: number;
     room_type?: number;
-  }) => apiClient.get("/bookings/check_availability/", { params }),
+  }) => apiClient.get("/bookings/reservations/check_availability/", { params }),
 
   // Reservations
   listReservations: (params?: Record<string, any>) =>
