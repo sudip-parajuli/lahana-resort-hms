@@ -22,11 +22,13 @@ import { RoomStatusGrid } from "@/components/modules/rooms/RoomStatusGrid";
 import { RoomDetailSheet } from "@/components/modules/rooms/RoomDetailSheet";
 import type { Room, RoomType, Reservation, InventoryItem, HousekeepingTask, MaintenanceRequest, Order, DiningTable } from "@/lib/types";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 export default function DashboardPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [time, setTime] = useState(new Date());
+  const t = useTranslations("Dashboard");
 
   // Data states
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -161,10 +163,12 @@ export default function DashboardPage() {
     return (
       <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-slate-950 text-white gap-3">
         <Loader2 className="h-10 w-10 text-cyan-500 animate-spin" />
-        <span className="text-sm text-slate-400 font-medium">Synthesizing resort operations...</span>
+        <span className="text-sm text-slate-400 font-medium">{t("loading")}</span>
       </div>
     );
   }
+
+  const locale = user?.preferred_language || "en";
 
   return (
     <div className="p-6 space-y-6">
@@ -172,13 +176,19 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            Good {time.getHours() < 12 ? "Morning" : time.getHours() < 17 ? "Afternoon" : "Evening"},{" "}
+            {time.getHours() < 12 ? t("good_morning") : time.getHours() < 17 ? t("good_afternoon") : t("good_evening")},{" "}
             <span className="bg-gradient-to-r from-[#C9A84C] to-amber-300 bg-clip-text text-transparent">
-              {user?.first_name ?? "Manager"}
+              {user?.first_name ?? t("manager")}
             </span>
           </h1>
           <p className="text-slate-400 text-sm">
-            Operational overview for {time.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {t("overview_for")}{" "}
+            {time.toLocaleDateString(locale === "ne" ? "ne-NP" : "en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -192,7 +202,11 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 text-slate-400 bg-slate-900/40 border border-slate-800/80 rounded-xl px-4 py-2 h-10">
             <Clock className="h-4 w-4 text-[#C9A84C]" />
             <span className="font-mono text-sm font-medium text-slate-300">
-              {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {time.toLocaleTimeString(locale === "ne" ? "ne-NP" : "en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
             </span>
           </div>
         </div>
@@ -203,7 +217,7 @@ export default function DashboardPage() {
         <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Occupancy Rate
+              {t("occupancy_rate")}
             </CardTitle>
             <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 shadow-sm">
               <Bed className="h-4 w-4 text-cyan-400" />
@@ -211,14 +225,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{occupancyRate.toFixed(1)}%</div>
-            <p className="text-[10px] text-slate-500 mt-1">{inHouseCount} active in-house reservations</p>
+            <p className="text-[10px] text-slate-500 mt-1">{t("active_res", { count: inHouseCount })}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Expected Arrivals
+              {t("expected_arrivals")}
             </CardTitle>
             <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shadow-sm">
               <CalendarCheck className="h-4 w-4 text-emerald-400" />
@@ -226,14 +240,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{arrivals.length}</div>
-            <p className="text-[10px] text-slate-500 mt-1">{departures.length} expected check-outs today</p>
+            <p className="text-[10px] text-slate-500 mt-1">{t("expected_checkouts", { count: departures.length })}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Restaurant Covers
+              {t("restaurant_covers")}
             </CardTitle>
             <div className="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20 shadow-sm">
               <Utensils className="h-4 w-4 text-violet-400" />
@@ -241,14 +255,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{restaurantCovers}</div>
-            <p className="text-[10px] text-slate-500 mt-1">{activeOrdersCount} active table orders in shift</p>
+            <p className="text-[10px] text-slate-500 mt-1">{t("active_orders", { count: activeOrdersCount })}</p>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900/40 border-slate-800/60 shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Today's Revenue
+              {t("todays_revenue")}
             </CardTitle>
             <div className="p-2 rounded-lg bg-[#2D5016]/10 border border-[#2D5016]/20 shadow-sm">
               <DollarSign className="h-4 w-4 text-[#C9A84C]" />
@@ -256,7 +270,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">Rs. {todayRevenue.toLocaleString()}</div>
-            <p className="text-[10px] text-slate-500 mt-1">Real-time checkouts and dining receipts</p>
+            <p className="text-[10px] text-slate-500 mt-1">{t("revenue_sub")}</p>
           </CardContent>
         </Card>
       </div>
@@ -271,11 +285,11 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-semibold text-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Bed className="h-4.5 w-4.5 text-[#C9A84C]" />
-                  <span>Resort Villa & Room Status Grid</span>
+                  <span>{t("room_status_grid")}</span>
                 </div>
                 <Link href="/rooms">
                   <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-0.5">
-                    Manage Rooms <ArrowUpRight className="h-3 w-3" />
+                    {t("manage_rooms")} <ArrowUpRight className="h-3 w-3" />
                   </span>
                 </Link>
               </CardTitle>
@@ -294,13 +308,13 @@ export default function DashboardPage() {
             <CardHeader className="border-b border-slate-900 pb-4">
               <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
                 <AlertTriangle className="h-4.5 w-4.5 text-amber-500 animate-pulse" />
-                <span>Resort Operations Alerts</span>
+                <span>{t("operations_alerts")}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-3.5 max-h-[300px] overflow-y-auto scrollbar-thin">
               {lowStockItems.length === 0 && pendingHKTasks.length === 0 && openMaintenance.length === 0 ? (
                 <div className="py-6 text-center text-slate-500 text-xs font-medium">
-                  All systems normal. No pending alerts.
+                  {t("all_systems_normal")}
                 </div>
               ) : (
                 <>
@@ -309,7 +323,7 @@ export default function DashboardPage() {
                     <div key={m.id} className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl flex items-start gap-2.5">
                       <Hammer className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-bold text-slate-200 block">Villa {m.room_number} Maintenance</span>
+                        <span className="text-xs font-bold text-slate-200 block">{t("maintenance_alert", { room: m.room_number })}</span>
                         <p className="text-[10px] text-slate-400 truncate mt-0.5">{m.description}</p>
                       </div>
                       <Badge className="bg-red-500/10 text-red-400 text-[8px] uppercase font-bold shrink-0">{m.category}</Badge>
@@ -317,16 +331,16 @@ export default function DashboardPage() {
                   ))}
 
                   {/* Housekeeping task alerts */}
-                  {pendingHKTasks.map((t) => (
-                    <div key={t.id} className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2.5">
+                  {pendingHKTasks.map((t_hk) => (
+                    <div key={t_hk.id} className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2.5">
                       <Bed className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-bold text-slate-200 block">Room {t.room_number} Housekeeping</span>
+                        <span className="text-xs font-bold text-slate-200 block">{t("housekeeping_alert", { room: t_hk.room_number })}</span>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          {t.task_type.replace("_", " ")} — Assigned to: {t.assigned_to_name || "Unassigned"}
+                          {t_hk.task_type.replace("_", " ")} — {t("assigned_to")}: {t_hk.assigned_to_name || t("unassigned")}
                         </p>
                       </div>
-                      <Badge className="bg-amber-500/10 text-amber-400 text-[8px] uppercase font-bold shrink-0">{t.status}</Badge>
+                      <Badge className="bg-amber-500/10 text-amber-400 text-[8px] uppercase font-bold shrink-0">{t_hk.status}</Badge>
                     </div>
                   ))}
 
@@ -335,9 +349,9 @@ export default function DashboardPage() {
                     <div key={item.id} className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-2.5">
                       <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-bold text-slate-200 block">{item.name} Low Stock</span>
+                        <span className="text-xs font-bold text-slate-200 block">{t("low_stock_alert", { name: item.name })}</span>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          Currently: {item.current_stock} {item.unit} (Reorder: {item.reorder_level} {item.unit})
+                          {t("currently")}: {item.current_stock} {item.unit} ({t("reorder")}: {item.reorder_level} {item.unit})
                         </p>
                       </div>
                     </div>
@@ -353,19 +367,19 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-semibold text-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Utensils className="h-4.5 w-4.5 text-violet-400" />
-                  <span>Restaurant Live Ratio</span>
+                  <span>{t("restaurant_live_ratio")}</span>
                 </div>
                 <Link href="/pos">
                   <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-0.5">
-                    POS Terminal <ArrowUpRight className="h-3 w-3" />
+                    {t("pos_terminal")} <ArrowUpRight className="h-3 w-3" />
                   </span>
                 </Link>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
               <div className="flex justify-between items-center text-xs text-slate-400">
-                <span>Occupied Tables</span>
-                <span className="font-semibold text-slate-200">{occupiedTables} / {totalTables} tables</span>
+                <span>{t("occupied_tables")}</span>
+                <span className="font-semibold text-slate-200">{t("tables_stat", { occupied: occupiedTables, total: totalTables })}</span>
               </div>
               <div className="h-2 w-full rounded-full bg-slate-950 overflow-hidden">
                 <div
@@ -386,11 +400,11 @@ export default function DashboardPage() {
             <CardTitle className="text-sm font-semibold text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CalendarCheck className="h-4.5 w-4.5 text-emerald-400" />
-                <span>Expected Arrivals Today</span>
+                <span>{t("expected_arrivals_today")}</span>
               </div>
               <Link href="/frontdesk">
                 <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-0.5">
-                  Front Desk Desk <ArrowUpRight className="h-3 w-3" />
+                  {t("front_desk")} <ArrowUpRight className="h-3 w-3" />
                 </span>
               </Link>
             </CardTitle>
@@ -398,17 +412,17 @@ export default function DashboardPage() {
           <CardContent className="pt-4 overflow-x-auto">
             {arrivals.length === 0 ? (
               <div className="py-8 text-center text-slate-500 text-xs font-medium">
-                No expected arriving guests remaining today.
+                {t("no_expected_arrivals")}
               </div>
             ) : (
               <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-500 text-[10px] font-bold uppercase tracking-wider pb-2">
-                    <th className="py-2.5">Guest</th>
-                    <th>Room Assigned</th>
-                    <th>Proximity</th>
-                    <th>Booking Source</th>
-                    <th className="text-right">Actions</th>
+                    <th className="py-2.5">{t("guest")}</th>
+                    <th>{t("room_assigned")}</th>
+                    <th>{t("proximity")}</th>
+                    <th>{t("booking_source")}</th>
+                    <th className="text-right">{t("actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50 text-xs">
@@ -418,10 +432,10 @@ export default function DashboardPage() {
                         {arr.guest.first_name} {arr.guest.last_name}
                       </td>
                       <td>
-                        {arr.room?.room_number ? `Room ${arr.room.room_number} (${arr.room.room_type?.name})` : "Unassigned"}
+                        {arr.room?.room_number ? `Room ${arr.room.room_number} (${arr.room.room_type?.name})` : t("unassigned")}
                       </td>
                       <td className="text-slate-400">
-                        {arr.total_nights} nights
+                        {arr.total_nights} {locale === "ne" ? "रात" : "nights"}
                       </td>
                       <td className="capitalize text-slate-400">
                         {arr.booking_source.replace("_", " ")}
@@ -429,7 +443,7 @@ export default function DashboardPage() {
                       <td className="text-right">
                         <Link href="/frontdesk">
                           <Button size="xs" className="bg-[#2D5016] text-[#FAFAF7] hover:bg-[#1E3A0E] text-[10px]">
-                            Check-In Desk
+                            {t("checkin_desk")}
                           </Button>
                         </Link>
                       </td>

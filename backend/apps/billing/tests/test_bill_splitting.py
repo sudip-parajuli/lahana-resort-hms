@@ -81,8 +81,12 @@ class TestGroupBillSplitting:
         
         # Verify split payments list is serialized
         assert len(response.data["split_payments"]) == 2
-        assert response.data["split_payments"][0]["amount"] == "10000.00"
-        assert response.data["split_payments"][0]["payment_method"] == "esewa"
+        amounts = [s["amount"] for s in response.data["split_payments"]]
+        methods = [s["payment_method"] for s in response.data["split_payments"]]
+        assert "5000.00" in amounts
+        assert "10000.00" in amounts
+        assert "cash" in methods
+        assert "esewa" in methods
 
         # Check DB states
         with schema_context(billing_tenant.schema_name):

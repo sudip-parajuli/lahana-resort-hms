@@ -60,7 +60,10 @@ class SingleTenantMiddleware:
                 request.tenant = tenant
             else:
                 connection.set_schema_to_public()
-        except Exception:
+        except Exception as e:
+            import traceback
+            print(f"DEBUG: SingleTenantMiddleware Exception: {e}")
+            traceback.print_exc()
             # During initial migrations, Client table might not exist yet
             connection.set_schema_to_public()
 

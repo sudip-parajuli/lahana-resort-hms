@@ -15,6 +15,8 @@ import { authApi } from "@/lib/api/auth";
 import { useWebSocket } from "@/lib/hooks/useWebSocket";
 import type { HousekeepingBoardRoom, UserProfile, MaintenanceRequest, MaintenanceCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
+import { useAuthStore } from "@/lib/store/authStore";
 
 const CATEGORIES = [
   { value: "plumbing", label: "Plumbing" },
@@ -25,6 +27,10 @@ const CATEGORIES = [
 ];
 
 export default function HousekeepingManagerPage() {
+  const t = useTranslations("Housekeeping");
+  const tCommon = useTranslations("Common");
+  const user = useAuthStore((s) => s.user);
+
   const [boardRooms, setBoardRooms] = useState<HousekeepingBoardRoom[]>([]);
   const [housekeepers, setHousekeepers] = useState<UserProfile[]>([]);
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
@@ -72,15 +78,6 @@ export default function HousekeepingManagerPage() {
     }
   }, []);
 
-  // Set up Axios inline client fallback if needed for generic requests
-  // (client is imported from local client file)
-  const loadMaintenance = async () => {
-    try {
-      const res = await housekeepingApi.createMaintenanceRequest({ room_id: 0, category: "other", description: "" });
-      // We will define it directly via axios if needed but we have client imported.
-    } catch {}
-  };
-
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -99,14 +96,9 @@ export default function HousekeepingManagerPage() {
     if (selectedRoomIds.length === 0 || assignedStaffId === "none") return;
     setSubmitting(true);
     try {
-      // Find active tasks for the selected rooms, or create tasks if not present
-      // In a premium PMS, we bulk assign housekeeping.
-      // Gather task IDs
       const taskIds: number[] = [];
       const roomsToAssign = boardRooms.filter((r) => selectedRoomIds.includes(r.room_id));
       
-      // We create tasks if rooms are dirty and have no active task
-      // In bulk assign, backend expects task_ids. So let's create tasks or find active ones
       const pendingTaskRooms = roomsToAssign.filter((r) => r.active_task);
       taskIds.push(...pendingTaskRooms.map((r) => r.active_task!.id));
 
@@ -208,6 +200,8 @@ export default function HousekeepingManagerPage() {
     return { total, clean, dirty, maint, cleaning };
   }, [boardRooms]);
 
+  const locale = user?.preferred_language || "en";
+
   return (
     <div className="p-6 space-y-6">
       {/* Top Navigation */}
@@ -217,8 +211,8 @@ export default function HousekeepingManagerPage() {
             <Paintbrush className="h-5 w-5 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Housekeeping Management</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Live cleaning boards and repair audits</p>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">{t("title_mgmt")}</h1>
+            <p className="text-xs text-slate-500 mt-0.5">{t("subtitle_mgmt")}</p>
           </div>
         </div>
 
@@ -230,7 +224,7 @@ export default function HousekeepingManagerPage() {
             onClick={() => setActiveTab("board")}
             className="border-slate-800 text-xs"
           >
-            Rooms Board
+            {t("rooms_board")}
           </Button>
           <Button
             variant={activeTab === "maintenance" ? "secondary" : "outline"}
@@ -238,7 +232,7 @@ export default function HousekeepingManagerPage() {
             onClick={() => setActiveTab("maintenance")}
             className="border-slate-800 text-xs"
           >
-            Maintenance Requests
+            {t("maintenance_requests")}
           </Button>
           <Button
             variant="ghost"
@@ -255,7 +249,7 @@ export default function HousekeepingManagerPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-          <span className="text-sm text-slate-400">Loading housekeeping board...</span>
+          <span className="text-sm text-slate-400">{t("loading_board")}</span>
         </div>
       ) : (
         <>
@@ -263,31 +257,31 @@ export default function HousekeepingManagerPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Card className="bg-slate-900/50 border-slate-900">
               <CardContent className="p-4 flex flex-col justify-center">
-                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">Total Rooms</span>
+                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">{t("total_rooms")}</span>
                 <span className="text-2xl font-bold text-slate-100 mt-1">{stats.total}</span>
               </CardContent>
             </Card>
             <Card className="bg-slate-900/50 border-slate-900">
               <CardContent className="p-4 flex flex-col justify-center">
-                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">Clean / Available</span>
+                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">{t("clean_available")}</span>
                 <span className="text-2xl font-bold text-emerald-400 mt-1">{stats.clean}</span>
               </CardContent>
             </Card>
             <Card className="bg-slate-900/50 border-slate-900">
               <CardContent className="p-4 flex flex-col justify-center">
-                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">Dirty / Check-outs</span>
+                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">{t("dirty_checkouts")}</span>
                 <span className="text-2xl font-bold text-rose-400 mt-1">{stats.dirty}</span>
               </CardContent>
             </Card>
             <Card className="bg-slate-900/50 border-slate-900">
               <CardContent className="p-4 flex flex-col justify-center">
-                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">In Cleaning</span>
+                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">{t("in_cleaning")}</span>
                 <span className="text-2xl font-bold text-blue-400 mt-1">{stats.cleaning}</span>
               </CardContent>
             </Card>
             <Card className="bg-slate-900/50 border-slate-900">
               <CardContent className="p-4 flex flex-col justify-center">
-                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">Maintenance</span>
+                <span className="text-xs text-slate-500 block uppercase tracking-wider font-semibold">{t("maintenance")}</span>
                 <span className="text-2xl font-bold text-slate-400 mt-1">{stats.maint}</span>
               </CardContent>
             </Card>
@@ -301,17 +295,17 @@ export default function HousekeepingManagerPage() {
                   <div className="flex items-center gap-2">
                     <CheckSquare className="h-5 w-5 text-cyan-400" />
                     <span className="text-sm font-semibold text-slate-200">
-                      {selectedRoomIds.length} rooms selected for cleaning assignment
+                      {t("rooms_selected", { count: selectedRoomIds.length })}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2.5 w-full sm:w-auto">
                     <Select value={assignedStaffId} onValueChange={(val) => setAssignedStaffId(val || "none")}>
                       <SelectTrigger className="w-[180px] bg-slate-950 border-slate-800 text-xs h-9">
-                        <SelectValue placeholder="Assign housekeeper" />
+                        <SelectValue placeholder={t("choose_staff")} />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
-                        <SelectItem value="none">Choose Staff...</SelectItem>
+                        <SelectItem value="none">{t("choose_staff")}</SelectItem>
                         {housekeepers.map((hk) => (
                           <SelectItem key={hk.id} value={hk.id.toString()}>
                             {hk.full_name}
@@ -326,7 +320,7 @@ export default function HousekeepingManagerPage() {
                       size="sm"
                       className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
                     >
-                      {submitting ? "Assigning..." : "Assign Tasks"}
+                      {submitting ? t("assigning") : t("assign_tasks")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -334,7 +328,7 @@ export default function HousekeepingManagerPage() {
                       size="sm"
                       className="text-slate-400 hover:text-slate-200"
                     >
-                      Cancel
+                      {tCommon("cancel")}
                     </Button>
                   </div>
                 </div>
@@ -346,7 +340,9 @@ export default function HousekeepingManagerPage() {
                   <div key={floor} className="space-y-3">
                     <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
                       <Layers className="h-4 w-4 text-cyan-500" />
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">{floor} Floor</h2>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        {t("floor", { floor: floor })}
+                      </h2>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -370,16 +366,16 @@ export default function HousekeepingManagerPage() {
                                   className="h-3.5 w-3.5 rounded border-slate-800 bg-slate-950 text-cyan-500 accent-cyan-500 cursor-pointer focus:ring-offset-0 focus:ring-0"
                                 />
                                 <span className="font-extrabold text-sm text-slate-100">
-                                  Room {room.room_number}
+                                  {locale === "ne" ? `कोठा ${room.room_number}` : `Room ${room.room_number}`}
                                 </span>
                               </div>
                               <Badge className={cn("text-[8.5px] uppercase px-1.5 py-0 border", getStatusColor(room.status))} variant="outline">
-                                {room.status}
+                                {locale === "ne" && room.status === "available" ? "सफा" : locale === "ne" && room.status === "dirty" ? "फोहोर" : locale === "ne" && room.status === "maintenance" ? "मर्मत" : locale === "ne" && room.status === "occupied" ? "भरिएको" : room.status}
                               </Badge>
                             </CardHeader>
                             <CardContent className="p-3.5 space-y-3 text-xs">
                               <div className="text-[10px] text-slate-500 font-medium">
-                                Type: {room.room_type_name}
+                                {t("type")}: {room.room_type_name}
                               </div>
 
                               {/* Cleaning assignment info */}
@@ -396,17 +392,17 @@ export default function HousekeepingManagerPage() {
                                           : "bg-amber-500/15 text-amber-400 border-amber-500/20"
                                       }`}
                                     >
-                                      {room.active_task.status.replace("_", " ")}
+                                      {locale === "ne" && room.active_task.status === "pending" ? "पेन्डिङ" : locale === "ne" && room.active_task.status === "in_progress" ? "सफाइ हुँदैछ" : room.active_task.status.replace("_", " ")}
                                     </Badge>
                                   </div>
                                   <div className="text-[10px] text-slate-400 flex items-center gap-1">
                                     <UserCheck className="h-3 w-3 text-cyan-500" />
-                                    <span>{room.active_task.assigned_to_name || "Unassigned"}</span>
+                                    <span>{room.active_task.assigned_to_name || t("unassigned")}</span>
                                   </div>
                                 </div>
                               ) : (
                                 <div className="text-[10px] text-slate-600 italic py-2">
-                                  No active cleaning task
+                                  {t("no_active_task")}
                                 </div>
                               )}
                             </CardContent>
@@ -422,7 +418,7 @@ export default function HousekeepingManagerPage() {
                                   }}
                                   className="h-6 px-2 text-[9px] bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/65"
                                 >
-                                  Maint.
+                                  {t("maint_btn")}
                                 </Button>
                               )}
                             </div>
@@ -440,26 +436,28 @@ export default function HousekeepingManagerPage() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-900 text-slate-500 font-bold uppercase tracking-wider">
-                    <th className="pb-3.5 pl-2">Room</th>
-                    <th className="pb-3.5">Category</th>
-                    <th className="pb-3.5">Description</th>
-                    <th className="pb-3.5">Reported By</th>
-                    <th className="pb-3.5">Status</th>
-                    <th className="pb-3.5">Resolution Notes</th>
-                    <th className="pb-3.5 pr-2 text-right">Actions</th>
+                    <th className="pb-3.5 pl-2">{t("room_number")}</th>
+                    <th className="pb-3.5">{t("category")}</th>
+                    <th className="pb-3.5">{t("description")}</th>
+                    <th className="pb-3.5">{t("reported_by")}</th>
+                    <th className="pb-3.5">{t("FrontDesk.status")}</th>
+                    <th className="pb-3.5">{t("resolution_logs")}</th>
+                    <th className="pb-3.5 pr-2 text-right">{t("actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/60">
                   {maintenanceRequests.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-10 text-slate-500 italic">
-                        No maintenance requests recorded.
+                        {t("no_maintenance")}
                       </td>
                     </tr>
                   ) : (
                     maintenanceRequests.map((req) => (
                       <tr key={req.id} className="text-slate-300 hover:bg-slate-950/20">
-                        <td className="py-3.5 pl-2 font-bold text-slate-200">Room {req.room_number}</td>
+                        <td className="py-3.5 pl-2 font-bold text-slate-200">
+                          {locale === "ne" ? `कोठा ${req.room_number}` : `Room ${req.room_number}`}
+                        </td>
                         <td className="py-3.5 capitalize font-medium">{req.category}</td>
                         <td className="py-3.5 max-w-[200px] truncate">{req.description}</td>
                         <td className="py-3.5 text-slate-400">{req.reported_by_name}</td>
@@ -473,7 +471,7 @@ export default function HousekeepingManagerPage() {
                                 : "bg-red-500/10 text-red-400 border-red-500/20"
                             }`}
                           >
-                            {req.status}
+                            {locale === "ne" && req.status === "open" ? "पेन्डिङ" : locale === "ne" && req.status === "in_progress" ? "कार्य प्रगतिमा" : locale === "ne" && req.status === "resolved" ? "समाधान गरिएको" : req.status}
                           </Badge>
                         </td>
                         <td className="py-3.5 max-w-[200px] truncate text-slate-400">
@@ -489,7 +487,7 @@ export default function HousekeepingManagerPage() {
                               }}
                               className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] h-6"
                             >
-                              Resolve
+                              {t("resolve_btn")}
                             </Button>
                           )}
                         </td>
@@ -508,16 +506,16 @@ export default function HousekeepingManagerPage() {
         <DialogContent className="sm:max-w-[420px] bg-slate-950 border-slate-900 text-slate-100">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center gap-2">
-              <AlertTriangle className="h-4.5 w-4.5 text-amber-500" /> Report Maintenance Issue
+              <AlertTriangle className="h-4.5 w-4.5 text-amber-500" /> {t("report_issue")}
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-xs">
-              Room status transitions automatically to 'maintenance' and logs a repair ticket.
+              {t("report_issue_sub")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs text-slate-400">Category</Label>
+              <Label className="text-xs text-slate-400">{t("category")}</Label>
               <Select
                 value={mCategory}
                 onValueChange={(val) => setMCategory(val as MaintenanceCategory)}
@@ -528,7 +526,7 @@ export default function HousekeepingManagerPage() {
                 <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
                   {CATEGORIES.map((c) => (
                     <SelectItem key={c.value} value={c.value} className="text-xs">
-                      {c.label}
+                      {locale === "ne" && c.value === "plumbing" ? "प्लम्बिङ" : locale === "ne" && c.value === "electrical" ? "विद्युतीय" : locale === "ne" && c.value === "furniture" ? "फर्निचर" : locale === "ne" && c.value === "ac" ? "एसी / ह्भाक" : locale === "ne" && c.value === "other" ? "अन्य" : c.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -536,10 +534,10 @@ export default function HousekeepingManagerPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="m-desc" className="text-xs text-slate-400">Issue Specification</Label>
+              <Label htmlFor="m-desc" className="text-xs text-slate-400">{t("issue_specification")}</Label>
               <Textarea
                 id="m-desc"
-                placeholder="E.g. Leaking toilet pipe, AC compressor makes noise..."
+                placeholder={locale === "ne" ? "जस्तै: शौचालयको पाइप चुहावट, एसीबाट ठूलो आवाज..." : "E.g. Leaking toilet pipe, AC compressor makes noise..."}
                 value={mDescription}
                 onChange={(e) => setMDescription(e.target.value)}
                 className="bg-slate-900 border-slate-800 text-xs"
@@ -549,7 +547,7 @@ export default function HousekeepingManagerPage() {
 
           <DialogFooter className="border-t border-slate-900 pt-3">
             <Button size="sm" variant="outline" onClick={() => setIsMaintenanceOpen(false)} className="border-slate-800">
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               size="sm"
@@ -557,7 +555,7 @@ export default function HousekeepingManagerPage() {
               disabled={submitting || !mDescription.trim()}
               className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold"
             >
-              {submitting ? "Reporting..." : "Report Issue"}
+              {submitting ? t("reporting") : t("report_issue")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -568,18 +566,18 @@ export default function HousekeepingManagerPage() {
         <DialogContent className="sm:max-w-[420px] bg-slate-950 border-slate-900 text-slate-100">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-500" /> Resolve Repair Request
+              <ShieldCheck className="h-5 w-5 text-emerald-500" /> {t("resolve_request")}
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-xs">
-              Mark this request as resolved. Room status transitions back to 'dirty' for cleaning check.
+              {t("resolve_request_sub")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-1.5 py-2">
-            <Label htmlFor="res-notes" className="text-xs text-slate-400">Resolution Logs</Label>
+            <Label htmlFor="res-notes" className="text-xs text-slate-400">{t("resolution_logs")}</Label>
             <Textarea
               id="res-notes"
-              placeholder="Detail what repairs were conducted..."
+              placeholder={locale === "ne" ? "विवरण लेख्नुहोस् के मर्मत गरियो..." : "Detail what repairs were conducted..."}
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
               className="bg-slate-900 border-slate-800 text-xs"
@@ -588,7 +586,7 @@ export default function HousekeepingManagerPage() {
 
           <DialogFooter className="border-t border-slate-900 pt-3">
             <Button size="sm" variant="outline" onClick={() => setIsResolveOpen(false)} className="border-slate-800">
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               size="sm"
@@ -596,7 +594,7 @@ export default function HousekeepingManagerPage() {
               disabled={submitting || !resolutionNotes.trim()}
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
             >
-              {submitting ? "Resolving..." : "Complete Resolve"}
+              {submitting ? t("resolving") : t("complete_resolve")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -604,5 +602,5 @@ export default function HousekeepingManagerPage() {
     </div>
   );
 }
-// Import apiClient for direct call inside views
+
 import { apiClient } from "@/lib/api/client";

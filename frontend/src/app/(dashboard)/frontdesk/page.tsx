@@ -14,8 +14,13 @@ import { CheckInModal } from "@/components/modules/frontdesk/CheckInModal";
 import { CheckOutModal } from "@/components/modules/frontdesk/CheckOutModal";
 import { WalkInForm } from "@/components/modules/frontdesk/WalkInForm";
 import type { Reservation } from "@/lib/types";
+import { useTranslations } from "next-intl";
+import { useAuthStore } from "@/lib/store/authStore";
 
 export default function FrontDeskPage() {
+  const t = useTranslations("FrontDesk");
+  const user = useAuthStore((s) => s.user);
+
   const [data, setData] = useState<{
     arrivals: Reservation[];
     departures: Reservation[];
@@ -133,7 +138,7 @@ export default function FrontDeskPage() {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center space-y-4">
         <Loader2 className="h-10 w-10 animate-spin text-cyan-400" />
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Loading operations dashboard...</p>
+        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">{t("loading_ops")}</p>
       </div>
     );
   }
@@ -150,8 +155,8 @@ export default function FrontDeskPage() {
       {/* Title Header */}
       <div className="flex items-center justify-between border-b border-slate-900 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Today Front Desk operations</h1>
-          <p className="text-slate-400 text-sm">Monitor arrivals, active stays, and departures ledger.</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">{t("title")}</h1>
+          <p className="text-slate-400 text-sm">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -166,7 +171,7 @@ export default function FrontDeskPage() {
             className="bg-gradient-to-tr from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold rounded-lg h-10 px-4 gap-2 shadow-lg shadow-cyan-500/20"
           >
             <UserPlus className="h-4 w-4" />
-            Quick Walk-In Check In
+            {t("quick_walkin")}
           </Button>
         </div>
       </div>
@@ -182,9 +187,9 @@ export default function FrontDeskPage() {
         {/* Arrivals stat widget */}
         <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-xl flex items-center justify-between shadow-md">
           <div className="space-y-1">
-            <span className="text-slate-500 uppercase tracking-wider text-[10px] block">Expected Arrivals</span>
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] block">{t("expected_arrivals")}</span>
             <span className="text-2xl font-black text-white">{data?.arrivals.length}</span>
-            <span className="text-slate-400 block text-[10px]">Due check-ins today</span>
+            <span className="text-slate-400 block text-[10px]">{t("due_checkins")}</span>
           </div>
           <LogIn className="h-9 w-9 text-cyan-500 bg-cyan-500/5 p-2 rounded-xl border border-cyan-500/10" />
         </div>
@@ -192,9 +197,9 @@ export default function FrontDeskPage() {
         {/* In house guests widget */}
         <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-xl flex items-center justify-between shadow-md">
           <div className="space-y-1">
-            <span className="text-slate-500 uppercase tracking-wider text-[10px] block">Currently In-House</span>
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] block">{t("currently_in_house")}</span>
             <span className="text-2xl font-black text-white">{data?.in_house.length}</span>
-            <span className="text-slate-400 block text-[10px]">Active occupied rooms</span>
+            <span className="text-slate-400 block text-[10px]">{t("active_occupied_rooms")}</span>
           </div>
           <ShieldAlert className="h-9 w-9 text-indigo-500 bg-indigo-500/5 p-2 rounded-xl border border-indigo-500/10" />
         </div>
@@ -202,9 +207,9 @@ export default function FrontDeskPage() {
         {/* Departures widget */}
         <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-xl flex items-center justify-between shadow-md">
           <div className="space-y-1">
-            <span className="text-slate-500 uppercase tracking-wider text-[10px] block">Due Departures</span>
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] block">{t("due_departures")}</span>
             <span className="text-2xl font-black text-white">{data?.departures.length}</span>
-            <span className="text-slate-400 block text-[10px]">Pending checkouts today</span>
+            <span className="text-slate-400 block text-[10px]">{t("pending_checkouts")}</span>
           </div>
           <LogOut className="h-9 w-9 text-emerald-500 bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10" />
         </div>
@@ -215,7 +220,7 @@ export default function FrontDeskPage() {
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Filter today's roster by guest name, phone, or room..."
+          placeholder={t("search_placeholder")}
           className="bg-slate-900 border-slate-800 text-slate-100 rounded-lg pl-10 h-10 w-full"
         />
         <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
@@ -226,7 +231,7 @@ export default function FrontDeskPage() {
         {/* Columns 1: Arrivals */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-slate-900 pb-2">
-            <h3 className="font-bold text-sm text-cyan-400 uppercase tracking-wider">Arrivals roster ({arrivalsFiltered.length})</h3>
+            <h3 className="font-bold text-sm text-cyan-400 uppercase tracking-wider">{t("arrivals_roster", { count: arrivalsFiltered.length })}</h3>
           </div>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {arrivalsFiltered.length > 0 ? (
@@ -241,7 +246,7 @@ export default function FrontDeskPage() {
                 />
               ))
             ) : (
-              <p className="text-slate-600 text-xs py-4 font-medium text-center border border-dashed border-slate-900/60 rounded-xl">No arrivals scheduled.</p>
+              <p className="text-slate-600 text-xs py-4 font-medium text-center border border-dashed border-slate-900/60 rounded-xl">{t("no_arrivals")}</p>
             )}
           </div>
         </div>
@@ -249,7 +254,7 @@ export default function FrontDeskPage() {
         {/* Columns 2: In House */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-slate-900 pb-2">
-            <h3 className="font-bold text-sm text-indigo-400 uppercase tracking-wider">Active In-House ({inHouseFiltered.length})</h3>
+            <h3 className="font-bold text-sm text-indigo-400 uppercase tracking-wider">{t("active_in_house_roster", { count: inHouseFiltered.length })}</h3>
           </div>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {inHouseFiltered.length > 0 ? (
@@ -264,7 +269,7 @@ export default function FrontDeskPage() {
                 />
               ))
             ) : (
-              <p className="text-slate-600 text-xs py-4 font-medium text-center border border-dashed border-slate-900/60 rounded-xl">No active guest rooms.</p>
+              <p className="text-slate-600 text-xs py-4 font-medium text-center border border-dashed border-slate-900/60 rounded-xl">{t("no_active")}</p>
             )}
           </div>
         </div>
@@ -272,7 +277,7 @@ export default function FrontDeskPage() {
         {/* Columns 3: Departures */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-slate-900 pb-2">
-            <h3 className="font-bold text-sm text-emerald-400 uppercase tracking-wider">Departures roster ({departuresFiltered.length})</h3>
+            <h3 className="font-bold text-sm text-emerald-400 uppercase tracking-wider">{t("departures_roster", { count: departuresFiltered.length })}</h3>
           </div>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {departuresFiltered.length > 0 ? (
@@ -287,7 +292,7 @@ export default function FrontDeskPage() {
                 />
               ))
             ) : (
-              <p className="text-slate-600 text-xs py-4 font-medium text-center border border-dashed border-slate-900/60 rounded-xl">No departures scheduled.</p>
+              <p className="text-slate-600 text-xs py-4 font-medium text-center border border-dashed border-slate-900/60 rounded-xl">{t("no_departures")}</p>
             )}
           </div>
         </div>

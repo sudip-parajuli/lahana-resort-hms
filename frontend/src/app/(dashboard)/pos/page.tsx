@@ -15,12 +15,13 @@ import { OfflineBanner } from "@/components/modules/pos/OfflineBanner";
 import { getCacheItem, setCacheItem } from "@/lib/offlineQueue";
 import { useWebSocket } from "@/lib/hooks/useWebSocket";
 import { toast } from "sonner";
-import { Bell } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 function POSContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderIdParam = searchParams.get("orderId");
+  const t = useTranslations("POS");
 
   const { tableId, setTable, clearCart } = usePOSStore();
 
@@ -129,7 +130,6 @@ function POSContent() {
   }, [orderIdParam, router, setTable]);
 
   const handleAddItem = (item: MenuItem) => {
-    // Convert price to float for cart representation
     usePOSStore.getState().addItem({
       id: item.id,
       name: item.name,
@@ -138,7 +138,6 @@ function POSContent() {
   };
 
   const handleOrderCreated = (order: Order) => {
-    // Reset selections and refresh orders list
     clearCart();
     loadBaseData();
     router.push(`/pos?orderId=${order.id}`);
@@ -150,7 +149,6 @@ function POSContent() {
   };
 
   const handleOrderPaid = (order: Order) => {
-    // Settle resets cart
     clearCart();
     setActiveOrder(null);
     loadBaseData();
@@ -180,15 +178,15 @@ function POSContent() {
               <ShoppingCart className="h-4.5 w-4.5 text-cyan-400" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-slate-100">POS Ordering Terminal</h1>
-              <p className="text-[10px] text-slate-500">Cart checkout and order management</p>
+              <h1 className="text-base font-bold text-slate-100">{t("terminal_title")}</h1>
+              <p className="text-[10px] text-slate-500">{t("terminal_subtitle")}</p>
             </div>
           </div>
 
           {/* Active Orders Quick-Selector */}
           {activeOrders.length > 0 && (
             <div className="flex items-center gap-1.5 ml-4">
-              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Active:</span>
+              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{t("active")}:</span>
               <div className="flex gap-1 overflow-x-auto max-w-[240px] scrollbar-none py-0.5">
                 {activeOrders.map((o) => (
                   <Button
@@ -214,12 +212,12 @@ function POSContent() {
         <div className="flex items-center gap-2">
           <Link href="/pos/tables">
             <Button variant="outline" size="sm" className="border-slate-800 text-slate-300 hover:bg-slate-900 text-xs">
-              <LayoutGrid className="h-4 w-4 mr-1.5" /> Tables Map
+              <LayoutGrid className="h-4 w-4 mr-1.5" /> {t("tables_map")}
             </Button>
           </Link>
           <Link href="/pos/kds">
             <Button variant="outline" size="sm" className="border-slate-800 text-slate-300 hover:bg-slate-900 text-xs">
-              <ChefHat className="h-4 w-4 mr-1.5" /> Kitchen Display (KDS)
+              <ChefHat className="h-4 w-4 mr-1.5" /> {t("kds")}
             </Button>
           </Link>
           <Button
@@ -237,7 +235,7 @@ function POSContent() {
       {loading ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-          <span className="text-sm text-slate-400 font-medium">Loading menu catalog...</span>
+          <span className="text-sm text-slate-400 font-medium">{t("loading_menu")}</span>
         </div>
       ) : (
         <div className="flex-1 flex overflow-hidden">
@@ -250,7 +248,7 @@ function POSContent() {
           {loadingOrder ? (
             <div className="w-[380px] border-l border-slate-900 bg-slate-950 flex flex-col items-center justify-center gap-2">
               <Loader2 className="h-6 w-6 text-cyan-500 animate-spin" />
-              <span className="text-xs text-slate-400">Loading order ticket...</span>
+              <span className="text-xs text-slate-400">{t("loading_order")}</span>
             </div>
           ) : (
             <OrderPanel
@@ -273,12 +271,13 @@ function POSContent() {
 }
 
 export default function POSPage() {
+  const t = useTranslations("POS");
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-          <span className="text-sm text-slate-400">Loading ordering screen...</span>
+          <span className="text-sm text-slate-400">{t("loading_menu")}</span>
         </div>
       </div>
     }>

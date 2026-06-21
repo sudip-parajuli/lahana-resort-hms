@@ -142,16 +142,29 @@ ASGI_APPLICATION = "config.asgi.application"
 # ─────────────────────────────
 # Database (django-tenants PostgreSQL backend)
 # ─────────────────────────────
-DATABASES = {
-    "default": {
-        "ENGINE": "django_tenants.postgresql_backend",
-        "NAME": config("POSTGRES_DB", default="sia_hms_db"),
-        "USER": config("POSTGRES_USER", default="sia_hms_user"),
-        "PASSWORD": config("POSTGRES_PASSWORD", default="sia_hms_password"),
-        "HOST": config("POSTGRES_HOST", default="localhost"),
-        "PORT": config("POSTGRES_PORT", default="5432"),
+import dj_database_url
+
+DATABASE_URL = config("DATABASE_URL", default="")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            engine="django_tenants.postgresql_backend",
+            conn_max_age=0,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django_tenants.postgresql_backend",
+            "NAME": config("POSTGRES_DB", default="sia_hms_db"),
+            "USER": config("POSTGRES_USER", default="sia_hms_user"),
+            "PASSWORD": config("POSTGRES_PASSWORD", default="sia_hms_password"),
+            "HOST": config("POSTGRES_HOST", default="localhost"),
+            "PORT": config("POSTGRES_PORT", default="5432"),
+        }
+    }
 
 DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 
