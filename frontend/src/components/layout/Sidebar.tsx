@@ -69,7 +69,7 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <span className="font-bold text-sm tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-            LAHANA HMS
+            SIA HMS
           </span>
         )}
       </div>
