@@ -63,3 +63,4 @@ minio_data/
 
 # Backup
 *.bak
+.vercel

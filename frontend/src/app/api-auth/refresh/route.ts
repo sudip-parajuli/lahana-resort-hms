@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       "Content-Type": "application/json",
     };
     if (host) {
-      headers["Host"] = host;
+      headers["X-Forwarded-Host"] = host;
     }
 
     const response = await axios.post(

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       Authorization: `Bearer ${currentAccessToken}`,
     };
     if (host) {
-      headers["Host"] = host;
+      headers["X-Forwarded-Host"] = host;
     }
 
     // Call the Django backend impersonate endpoint

@@ -10,7 +10,7 @@ async function fetchProfile(accessToken: string, host: string | null) {
     Authorization: `Bearer ${accessToken}`,
   };
   if (host) {
-    headers["Host"] = host;
+    headers["X-Forwarded-Host"] = host;
   }
   return axios.get(`${BACKEND_URL}/api/auth/me/`, {
     headers,
@@ -98,7 +98,7 @@ export async function PUT(request: NextRequest) {
       Authorization: `Bearer ${accessToken}`,
     };
     if (host) {
-      headers["Host"] = host;
+      headers["X-Forwarded-Host"] = host;
     }
 
     let response = await axios.put(`${BACKEND_URL}/api/auth/me/`, body, {
@@ -140,7 +140,7 @@ async function attemptRefresh(host: string | null, refreshToken: string): Promis
       "Content-Type": "application/json",
     };
     if (host) {
-      headers["Host"] = host;
+      headers["X-Forwarded-Host"] = host;
     }
 
     const response = await axios.post(

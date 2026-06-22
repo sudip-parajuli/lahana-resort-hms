@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       "Content-Type": "application/json",
     };
     if (host) {
-      headers["Host"] = host;
+      headers["X-Forwarded-Host"] = host;
     }
     if (accessToken) {
       headers["Authorization"] = `Bearer ${accessToken}`;

@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     };
     if (host) {
       // Forward the host header so django-tenants can identify the correct tenant schema
-      headers["Host"] = host;
+      headers["X-Forwarded-Host"] = host;
     }
 
     // Call the Django backend login endpoint
